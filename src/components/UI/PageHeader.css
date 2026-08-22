@@ -1,0 +1,24 @@
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  margin-bottom: 24px;
+}
+
+.page-header h1 {
+  margin: 0;
+}
+
+.page-subtitle {
+  margin-top: 6px;
+
+  color: #666;
+
+  font-size: 14px;
+}
+
+.page-actions {
+  display: flex;
+  gap: 10px;
+}

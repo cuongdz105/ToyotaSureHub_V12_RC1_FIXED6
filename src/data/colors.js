@@ -1,0 +1,20 @@
+export const colors = [
+  "Trắng",
+  "Trắng ngọc trai",
+  "Đen",
+  "Bạc",
+  "Xám",
+  "Đỏ",
+  "Đỏ đô",
+  "Nâu",
+  "Vàng cát",
+  "Xanh",
+  "Xanh đậm",
+  "Xanh rêu",
+  "Cam",
+  "Be",
+  "Ghi",
+  "Titan",
+  "Bạc ánh kim",
+  "Đen ánh tím"
+];

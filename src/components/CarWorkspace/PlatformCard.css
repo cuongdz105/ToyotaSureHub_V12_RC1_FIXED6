@@ -1,0 +1,59 @@
+.platform-card{
+
+    border:1px solid #e5e5e5;
+
+    border-radius:12px;
+
+    padding:18px;
+
+    margin-bottom:18px;
+
+    background:#fff;
+
+}
+
+.platform-header{
+
+    margin-bottom:14px;
+
+}
+
+.platform-header h3{
+
+    margin:0;
+
+    font-size:18px;
+
+}
+
+.platform-status{
+
+    margin-bottom:18px;
+
+}
+
+.platform-status p{
+
+    margin:6px 0;
+
+}
+
+.platform-actions{
+
+    display:flex;
+
+    gap:10px;
+
+}
+
+.platform-actions button{
+
+    cursor:pointer;
+
+    padding:8px 16px;
+
+    border:none;
+
+    border-radius:8px;
+
+}

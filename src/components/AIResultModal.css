@@ -1,0 +1,122 @@
+.ai-overlay{
+    position:fixed;
+    inset:0;
+
+    background:rgba(0,0,0,.45);
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    z-index:9999;
+}
+
+.ai-modal{
+
+    width:700px;
+
+    max-width:90vw;
+
+    background:white;
+
+    border-radius:16px;
+
+    overflow:hidden;
+
+    box-shadow:0 20px 60px rgba(0,0,0,.25);
+
+}
+
+.ai-header{
+
+    padding:20px;
+
+    border-bottom:1px solid #eee;
+
+}
+
+.ai-body{
+
+    padding:20px;
+
+    max-height:60vh;
+
+    overflow:auto;
+
+}
+
+.ai-body pre{
+
+    white-space:pre-wrap;
+
+    font-family:inherit;
+
+    line-height:1.6;
+
+}
+
+.ai-footer{
+
+    padding:20px;
+
+    display:flex;
+
+    justify-content:flex-end;
+
+    gap:12px;
+
+    border-top:1px solid #eee;
+
+}
+
+.ai-footer button{
+
+    padding:10px 18px;
+
+    cursor:pointer;
+
+    border:none;
+
+    border-radius:8px;
+
+}
+
+.ai-loading{
+
+    text-align:center;
+
+    padding:50px;
+
+}
+
+.spinner{
+
+    width:42px;
+
+    height:42px;
+
+    border:4px solid #ddd;
+
+    border-top-color:#e60012;
+
+    border-radius:50%;
+
+    animation:spin .8s linear infinite;
+
+    margin:auto;
+
+    margin-bottom:15px;
+
+}
+
+@keyframes spin{
+
+    to{
+
+        transform:rotate(360deg);
+
+    }
+
+}

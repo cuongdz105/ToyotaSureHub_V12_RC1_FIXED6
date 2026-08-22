@@ -1,0 +1,37 @@
+.workspace-card{
+
+    background:#fff;
+
+    border-radius:14px;
+
+    padding:20px;
+
+    margin-top:24px;
+
+    box-shadow:0 6px 20px rgba(0,0,0,.06);
+
+}
+
+.workspace-card-header{
+
+    border-bottom:1px solid #eee;
+
+    margin-bottom:18px;
+
+    padding-bottom:10px;
+
+}
+
+.workspace-card-header h2{
+
+    font-size:20px;
+
+    margin:0;
+
+}
+
+.workspace-card-body{
+
+    display:block;
+
+}

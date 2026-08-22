@@ -1,0 +1,29 @@
+.ai-menu{
+    display:flex;
+    flex-direction:column;
+    gap:15px;
+    margin-top:20px;
+}
+
+.ai-card{
+    border:1px solid #ddd;
+    border-radius:12px;
+    padding:18px;
+    cursor:pointer;
+    transition:.25s;
+    background:white;
+}
+
+.ai-card:hover{
+    transform:translateY(-3px);
+    box-shadow:0 10px 20px rgba(0,0,0,.12);
+}
+
+.ai-card h3{
+    margin:0;
+}
+
+.ai-card p{
+    color:#666;
+    margin-top:8px;
+}
