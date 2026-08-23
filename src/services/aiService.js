@@ -9,6 +9,8 @@ import { runAI } from "../ai/engine/aiEngine";
 import facebookPrompt from "../ai/prompts/facebook";
 import youtubePrompt from "../ai/prompts/youtube";
 import tiktokPrompt from "../ai/prompts/tiktok";
+import youtubePostPrompt from "../ai/prompts/youtubePost";
+import tiktokPostPrompt from "../ai/prompts/tiktokPost";
 import seoPrompt from "../ai/prompts/seo";
 import thumbnailPrompt from "../ai/prompts/thumbnail";
 import salesChatPrompt from "../ai/prompts/salesChat";
@@ -246,6 +248,29 @@ export async function generateYoutube(
   );
 }
 
+export async function generateYoutubeScript(
+  car,
+  researchContext = ""
+) {
+  return generateContent(
+    car,
+    "youtube-script",
+    youtubePrompt,
+    researchContext
+  );
+}
+
+export async function generateYoutubePost(
+  car,
+  researchContext = ""
+) {
+  return generateContent(
+    car,
+    "youtube-post",
+    youtubePostPrompt,
+    researchContext
+  );
+}
 
 // =======================================
 // TikTok
@@ -263,6 +288,29 @@ export async function generateTikTok(
   );
 }
 
+export async function generateTikTokScript(
+  car,
+  researchContext = ""
+) {
+  return generateContent(
+    car,
+    "tiktok-script",
+    tiktokPrompt,
+    researchContext
+  );
+}
+
+export async function generateTikTokPost(
+  car,
+  researchContext = ""
+) {
+  return generateContent(
+    car,
+    "tiktok-post",
+    tiktokPostPrompt,
+    researchContext
+  );
+}
 
 // =======================================
 // SEO
