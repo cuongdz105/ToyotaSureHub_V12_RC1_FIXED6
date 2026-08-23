@@ -54,6 +54,10 @@ import {
     runAI,
 } from "../engine/aiEngine";
 
+import {
+    getAITaskConfig,
+} from "../engine/taskConfig";
+
 
 // =======================================
 // 1. NGHIÊN CỨU STYLE TỪ BÀI MẪU
@@ -383,7 +387,8 @@ export async function generateWithStyle(
     const result =
         await runAI(
             prompt,
-            car
+            car,
+            getAITaskConfig("youtube")
         );
 
 

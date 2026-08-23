@@ -5,6 +5,7 @@
 
 import { buildPrompt } from "../ai/engine/promptBuilder";
 import { runAI } from "../ai/engine/aiEngine";
+import { getAITaskConfig } from "../ai/engine/taskConfig";
 
 import facebookPrompt from "../ai/prompts/facebook";
 import youtubePrompt from "../ai/prompts/youtube";
@@ -161,12 +162,17 @@ async function generateContent(
 
   // ---------------------------------------
   // Gọi AI
+  // Chọn model theo loại nội dung (xem taskConfig.js)
+  // để việc đơn giản không tốn tiền như việc phức tạp.
   // ---------------------------------------
+
+  const taskConfig = getAITaskConfig(type);
 
   let result =
     await runAI(
       prompt,
-      aiCar
+      aiCar,
+      taskConfig
     );
 
   // ---------------------------------------
@@ -185,7 +191,7 @@ async function generateContent(
 
   saveHistory({
     type,
-    model: "gpt-5.5",
+    model: taskConfig.model,
     carId: car.id,
     carName:
       `${car.brand} ${car.model} ${car.year}`,
