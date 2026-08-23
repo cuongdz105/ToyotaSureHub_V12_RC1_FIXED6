@@ -1,6 +1,6 @@
 // =======================================
 // ToyotaSureHub Vehicle Catalog
-// V11 - Base Catalog
+// V12 - Updated Catalog
 // =======================================
 //
 // Cấu trúc:
@@ -14,11 +14,6 @@
 //             └── seats
 //
 // aliases dùng cho AI Vision mapping.
-// Ví dụ:
-// "G"
-// "Vios G"
-// "Vios G CVT"
-// -> có thể map về "G CVT"
 //
 // =======================================
 
@@ -89,8 +84,48 @@ export const brands = [
 
         versions: [
           {
-            name: "G",
-            aliases: ["G", "Yaris G"],
+            name: "1.3",
+            aliases: ["1.3", "Yaris 1.3"],
+            fuel: "Xăng",
+            gearbox: "AT",
+            drivetrain: "FWD",
+            seats: 5,
+          },
+          {
+            name: "1.3 E",
+            aliases: ["1.3E", "1.3 E", "Yaris 1.3E", "Yaris E"],
+            fuel: "Xăng",
+            gearbox: "AT",
+            drivetrain: "FWD",
+            seats: 5,
+          },
+          {
+            name: "1.3 G",
+            aliases: ["1.3G", "1.3 G", "Yaris 1.3G", "Yaris G"],
+            fuel: "Xăng",
+            gearbox: "AT",
+            drivetrain: "FWD",
+            seats: 5,
+          },
+          {
+            name: "1.5",
+            aliases: ["1.5", "Yaris 1.5"],
+            fuel: "Xăng",
+            gearbox: "CVT",
+            drivetrain: "FWD",
+            seats: 5,
+          },
+          {
+            name: "1.5 E CVT",
+            aliases: ["1.5E", "1.5 E CVT", "Yaris 1.5E CVT"],
+            fuel: "Xăng",
+            gearbox: "CVT",
+            drivetrain: "FWD",
+            seats: 5,
+          },
+          {
+            name: "1.5G CVT",
+            aliases: ["1.5G", "1.5G CVT", "Yaris 1.5G CVT", "Yaris G"],
             fuel: "Xăng",
             gearbox: "CVT",
             drivetrain: "FWD",
@@ -106,11 +141,32 @@ export const brands = [
 
         versions: [
           {
-            name: "1.8G",
+            name: "G MT",
+            aliases: ["Altis G MT", "Corolla Altis G MT"],
+            fuel: "Xăng",
+            gearbox: "Số sàn",
+            drivetrain: "FWD",
+            seats: 5,
+          },
+          {
+            name: "1.8E CVT",
+            aliases: [
+              "1.8E",
+              "Altis 1.8E",
+              "Altis E",
+              "Corolla Altis 1.8E CVT",
+            ],
+            fuel: "Xăng",
+            gearbox: "CVT",
+            drivetrain: "FWD",
+            seats: 5,
+          },
+          {
+            name: "1.8G CVT",
             aliases: [
               "1.8G",
               "Altis 1.8G",
-              "Corolla Altis 1.8G",
+              "Corolla Altis 1.8G CVT",
             ],
             fuel: "Xăng",
             gearbox: "CVT",
@@ -123,6 +179,18 @@ export const brands = [
               "1.8V",
               "Altis 1.8V",
               "Corolla Altis 1.8V",
+            ],
+            fuel: "Xăng",
+            gearbox: "CVT",
+            drivetrain: "FWD",
+            seats: 5,
+          },
+          {
+            name: "2.0V",
+            aliases: [
+              "2.0V",
+              "Altis 2.0V",
+              "Corolla Altis 2.0V",
             ],
             fuel: "Xăng",
             gearbox: "CVT",
@@ -151,6 +219,14 @@ export const brands = [
 
         versions: [
           {
+            name: "2.0E",
+            aliases: ["2.0E", "Camry 2.0E"],
+            fuel: "Xăng",
+            gearbox: "6AT",
+            drivetrain: "FWD",
+            seats: 5,
+          },
+          {
             name: "2.0G",
             aliases: [
               "2.0G",
@@ -173,6 +249,22 @@ export const brands = [
             seats: 5,
           },
           {
+            name: "2.4G",
+            aliases: ["2.4G", "Camry 2.4G"],
+            fuel: "Xăng",
+            gearbox: "6AT",
+            drivetrain: "FWD",
+            seats: 5,
+          },
+          {
+            name: "2.5G",
+            aliases: ["2.5G", "Camry 2.5G"],
+            fuel: "Xăng",
+            gearbox: "6AT",
+            drivetrain: "FWD",
+            seats: 5,
+          },
+          {
             name: "2.5Q",
             aliases: [
               "2.5Q",
@@ -184,12 +276,33 @@ export const brands = [
             seats: 5,
           },
           {
-            name: "2.5HV",
+            name: "3.5Q",
+            aliases: ["3.5Q", "Camry 3.5Q"],
+            fuel: "Xăng",
+            gearbox: "6AT",
+            drivetrain: "FWD",
+            seats: 5,
+          },
+          {
+            name: "2.5HEV",
             aliases: [
+              "2.5HEV",
               "2.5HV",
               "HV",
               "Camry Hybrid",
-              "Camry 2.5HV",
+              "Camry 2.5HEV",
+            ],
+            fuel: "Hybrid",
+            gearbox: "e-CVT",
+            drivetrain: "FWD",
+            seats: 5,
+          },
+          {
+            name: "2.5HEV Top",
+            aliases: [
+              "2.5HEV Top",
+              "Camry HEV Top",
+              "Camry 2.5HEV Top",
             ],
             fuel: "Hybrid",
             gearbox: "e-CVT",
@@ -353,6 +466,7 @@ export const brands = [
             aliases: [
               "Xăng",
               "Innova Cross Xăng",
+              "Innova Cross V",
             ],
             fuel: "Xăng",
             gearbox: "CVT",
@@ -381,35 +495,88 @@ export const brands = [
 
         versions: [
           {
-            name: "2.4 AT",
-            aliases: [
-              "2.4",
-              "2.4 AT",
-              "Fortuner 2.4",
-            ],
+            name: "2.4G 4x2 MT",
+            aliases: ["2.4G 4x2 MT", "Fortuner 2.4G MT"],
+            fuel: "Dầu",
+            gearbox: "Số sàn",
+            drivetrain: "4x2",
+            seats: 7,
+          },
+          {
+            name: "2.4G 4x2 AT",
+            aliases: ["2.4G 4x2 AT", "Fortuner 2.4G AT"],
             fuel: "Dầu",
             gearbox: "6AT",
             drivetrain: "4x2",
             seats: 7,
           },
           {
-            name: "Legender",
-            aliases: [
-              "Legender",
-              "Fortuner Legender",
-            ],
+            name: "2.7V 4x2 AT",
+            aliases: ["2.7V 4x2 AT", "Fortuner 2.7V"],
+            fuel: "Xăng",
+            gearbox: "6AT",
+            drivetrain: "4x2",
+            seats: 7,
+          },
+          {
+            name: "2.7V 4x4 AT",
+            aliases: ["2.7V 4x4 AT", "Fortuner 2.7V 4x4"],
+            fuel: "Xăng",
+            gearbox: "6AT",
+            drivetrain: "4x4",
+            seats: 7,
+          },
+          {
+            name: "2.7 TRD Sportivo 4x2 AT",
+            aliases: ["TRD Sportivo 4x2", "Fortuner TRD Sportivo 4x2 AT"],
+            fuel: "Xăng",
+            gearbox: "6AT",
+            drivetrain: "4x2",
+            seats: 7,
+          },
+          {
+            name: "2.7 TRD Sportivo 4x4 AT",
+            aliases: ["TRD Sportivo 4x4", "Fortuner TRD Sportivo 4x4 AT"],
+            fuel: "Xăng",
+            gearbox: "6AT",
+            drivetrain: "4x4",
+            seats: 7,
+          },
+          {
+            name: "2.8 4x4 AT",
+            aliases: ["2.8 4x4 AT", "Fortuner 2.8 4x4"],
+            fuel: "Dầu",
+            gearbox: "6AT",
+            drivetrain: "4x4",
+            seats: 7,
+          },
+          {
+            name: "2.4 Legender 4x2 AT",
+            aliases: ["2.4 Legender 4x2", "Fortuner Legender 2.4 4x2"],
             fuel: "Dầu",
             gearbox: "6AT",
             drivetrain: "4x2",
             seats: 7,
           },
           {
-            name: "2.8 4x4",
-            aliases: [
-              "2.8",
-              "2.8 4x4",
-              "Fortuner 2.8",
-            ],
+            name: "2.7 4x2 Legender",
+            aliases: ["2.7 Legender 4x2", "Fortuner Legender 2.7 4x2"],
+            fuel: "Xăng",
+            gearbox: "6AT",
+            drivetrain: "4x2",
+            seats: 7,
+          },
+          {
+            name: "2.7 4x4 Legender",
+            aliases: ["2.7 Legender 4x4", "Fortuner Legender 2.7 4x4"],
+            fuel: "Xăng",
+            gearbox: "6AT",
+            drivetrain: "4x4",
+            seats: 7,
+          },
+          {
+            name: "2.8 Legender 4x4 AT",
+            aliases: ["2.8 Legender 4x4", "Fortuner Legender 2.8 4x4"],
             fuel: "Dầu",
             gearbox: "6AT",
             drivetrain: "4x4",
@@ -425,22 +592,128 @@ export const brands = [
 
         versions: [
           {
-            name: "2.4 4x2",
-            aliases: [
-              "Hilux 2.4",
-              "2.4 4x2",
-            ],
+            name: "2.4E 4x2 MT",
+            aliases: ["2.4E 4x2 MT", "Hilux 2.4E MT"],
+            fuel: "Dầu",
+            gearbox: "Số sàn",
+            drivetrain: "4x2",
+            seats: 5,
+          },
+          {
+            name: "2.4E 4x2 AT",
+            aliases: ["2.4E 4x2 AT", "Hilux 2.4E AT"],
             fuel: "Dầu",
             gearbox: "6AT",
             drivetrain: "4x2",
             seats: 5,
           },
           {
-            name: "2.8 4x4",
-            aliases: [
-              "Hilux 2.8",
-              "2.8 4x4",
-            ],
+            name: "2.4 4x2 AT",
+            aliases: ["2.4 4x2 AT", "Hilux 2.4 4x2 AT"],
+            fuel: "Dầu",
+            gearbox: "6AT",
+            drivetrain: "4x2",
+            seats: 5,
+          },
+          {
+            name: "2.4G 4x4 MT",
+            aliases: ["2.4G 4x4 MT", "Hilux 2.4G MT"],
+            fuel: "Dầu",
+            gearbox: "Số sàn",
+            drivetrain: "4x4",
+            seats: 5,
+          },
+          {
+            name: "2.4 4x4 MT",
+            aliases: ["2.4 4x4 MT", "Hilux 2.4 4x4 MT"],
+            fuel: "Dầu",
+            gearbox: "Số sàn",
+            drivetrain: "4x4",
+            seats: 5,
+          },
+          {
+            name: "2.5E 4x2 MT",
+            aliases: ["2.5E 4x2 MT", "Hilux 2.5E 4x2 MT"],
+            fuel: "Dầu",
+            gearbox: "Số sàn",
+            drivetrain: "4x2",
+            seats: 5,
+          },
+          {
+            name: "2.5E 4x4 MT",
+            aliases: ["2.5E 4x4 MT", "Hilux 2.5E 4x4 MT"],
+            fuel: "Dầu",
+            gearbox: "Số sàn",
+            drivetrain: "4x4",
+            seats: 5,
+          },
+          {
+            name: "2.8G 4x4 AT",
+            aliases: ["2.8G 4x4 AT", "Hilux 2.8G AT"],
+            fuel: "Dầu",
+            gearbox: "6AT",
+            drivetrain: "4x4",
+            seats: 5,
+          },
+          {
+            name: "2.8G 4x4 AT Adventure",
+            aliases: ["2.8G Adventure", "Hilux 2.8G 4x4 AT Adventure"],
+            fuel: "Dầu",
+            gearbox: "6AT",
+            drivetrain: "4x4",
+            seats: 5,
+          },
+          {
+            name: "2.8 4x4 AT Adventure",
+            aliases: ["2.8 Adventure", "Hilux 2.8 4x4 AT Adventure"],
+            fuel: "Dầu",
+            gearbox: "6AT",
+            drivetrain: "4x4",
+            seats: 5,
+          },
+          {
+            name: "3.0G 4x2 AT",
+            aliases: ["3.0G 4x2 AT", "Hilux 3.0G 4x2 AT"],
+            fuel: "Dầu",
+            gearbox: "6AT",
+            drivetrain: "4x2",
+            seats: 5,
+          },
+          {
+            name: "3.0G 4x4 MT",
+            aliases: ["3.0G 4x4 MT", "Hilux 3.0G 4x4 MT"],
+            fuel: "Dầu",
+            gearbox: "Số sàn",
+            drivetrain: "4x4",
+            seats: 5,
+          },
+          {
+            name: "3.0G 4x4 AT",
+            aliases: ["3.0G 4x4 AT", "Hilux 3.0G 4x4 AT"],
+            fuel: "Dầu",
+            gearbox: "6AT",
+            drivetrain: "4x4",
+            seats: 5,
+          },
+          {
+            name: "Standard 2.8 4x2 MT",
+            aliases: ["Standard 2.8 4x2 MT", "Hilux Standard"],
+            fuel: "Dầu",
+            gearbox: "Số sàn",
+            drivetrain: "4x2",
+            seats: 5,
+          },
+          {
+            name: "Pro 2.8 4x2 AT",
+            aliases: ["Pro 2.8 4x2 AT", "Hilux Pro"],
+            fuel: "Dầu",
+            gearbox: "6AT",
+            drivetrain: "4x2",
+            seats: 5,
+          },
+          {
+            name: "Trailhunter 2.8 4x4 AT",
+            aliases: ["Trailhunter", "Hilux Trailhunter"],
             fuel: "Dầu",
             gearbox: "6AT",
             drivetrain: "4x4",
@@ -456,10 +729,22 @@ export const brands = [
 
         versions: [
           {
-            name: "G",
+            name: "E MT",
             aliases: [
+              "Wigo E MT",
+              "E MT",
+            ],
+            fuel: "Xăng",
+            gearbox: "Số sàn",
+            drivetrain: "FWD",
+            seats: 5,
+          },
+          {
+            name: "G AT",
+            aliases: [
+              "Wigo G AT",
+              "G AT",
               "Wigo G",
-              "G",
             ],
             fuel: "Xăng",
             gearbox: "AT",
@@ -540,14 +825,48 @@ export const brands = [
 
   versions: [
     {
-      name: "300",
+      name: "VX",
       aliases: [
-        "Land Cruiser",
-        "Land Cruiser 300",
-        "LC300",
+        "Land Cruiser VX",
+        "LC VX",
       ],
       fuel: "Xăng",
       gearbox: "10AT",
+      drivetrain: "4x4",
+      seats: 7,
+    },
+    {
+      name: "VX-R",
+      aliases: [
+        "Land Cruiser VX-R",
+        "LC VX-R",
+        "VXR",
+      ],
+      fuel: "Xăng",
+      gearbox: "10AT",
+      drivetrain: "4x4",
+      seats: 7,
+    },
+    {
+      name: "4.6",
+      aliases: [
+        "Land Cruiser 4.6",
+        "LC 4.6",
+      ],
+      fuel: "Xăng",
+      gearbox: "AT",
+      drivetrain: "4x4",
+      seats: 7,
+    },
+    {
+      name: "4.7 LC300",
+      aliases: [
+        "Land Cruiser 4.7",
+        "LC300 4.7",
+        "4.7 LC300",
+      ],
+      fuel: "Xăng",
+      gearbox: "AT",
       drivetrain: "4x4",
       seats: 7,
     },
@@ -561,11 +880,33 @@ export const brands = [
 
   versions: [
     {
-      name: "Prado",
+      name: "2.7 TXL",
       aliases: [
-        "Prado",
-        "Land Cruiser Prado",
-        "LC Prado",
+        "Prado TXL",
+        "Land Cruiser Prado 2.7 TXL",
+      ],
+      fuel: "Xăng",
+      gearbox: "AT",
+      drivetrain: "4x4",
+      seats: 7,
+    },
+    {
+      name: "2.7 VX",
+      aliases: [
+        "Prado VX",
+        "Land Cruiser Prado 2.7 VX",
+      ],
+      fuel: "Xăng",
+      gearbox: "AT",
+      drivetrain: "4x4",
+      seats: 7,
+    },
+    {
+      name: "LC 250",
+      aliases: [
+        "Prado LC250",
+        "Land Cruiser Prado LC 250",
+        "LC250",
       ],
       fuel: "Xăng",
       gearbox: "AT",
