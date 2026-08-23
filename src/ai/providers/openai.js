@@ -10,6 +10,7 @@ export async function generate(prompt, car, options = {}) {
       temperature: 0.8,
       maxTokens: options.maxTokens || 3000,
       carId: car?.id || null,
+      images: options.images || [],
     },
   });
 

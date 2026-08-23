@@ -38,6 +38,9 @@ export const AI_TASK_CONFIG = {
 
     // Phân tích văn phong từ bài mẫu — cần hiểu sâu, giữ model tốt nhất
     "style-analysis": { model: "gpt-5.6-sol", maxTokens: 1500 },
+
+    // Nhận diện xe qua ảnh — cần model đọc được ảnh
+    "car-recognition": { model: "gpt-5.6-terra", maxTokens: 500 },
 };
 
 export function getAITaskConfig(type) {

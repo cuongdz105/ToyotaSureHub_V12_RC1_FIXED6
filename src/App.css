@@ -204,3 +204,86 @@ body{
   border-radius: 8px;
   border: 1px solid #ddd;
 }
+
+/* =======================================
+   RESPONSIVE - MOBILE SIDEBAR
+======================================= */
+
+.hamburger-btn {
+  display: none;
+  position: fixed;
+  top: 15px;
+  left: 15px;
+  z-index: 1001;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 8px;
+  background: #d71920;
+  color: white;
+  font-size: 22px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-overlay {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .hamburger-btn {
+    display: flex;
+  }
+
+  .app-layout {
+    position: relative;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    z-index: 1000;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    overflow-y: auto;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .sidebar-overlay.open {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 999;
+  }
+
+  .main-content {
+    padding-top: 60px;
+  }
+
+  .content {
+    padding: 15px;
+  }
+
+  .car-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .cards {
+    grid-template-columns: 1fr;
+  }
+}

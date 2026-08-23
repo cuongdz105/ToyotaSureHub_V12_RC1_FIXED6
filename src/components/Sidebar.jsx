@@ -1,15 +1,15 @@
 import { Link } from "react-router-dom";
 
-function Sidebar() {
+function Sidebar({ isOpen, onClose }) {
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${isOpen ? " open" : ""}`}>
       <h2>🚗 ToyotaSureHub</h2>
 
-      <Link to="/">
+      <Link to="/" onClick={onClose}>
         <button>📋 Dashboard</button>
       </Link>
 
-      <Link to="/cars">
+      <Link to="/cars" onClick={onClose}>
         <button>🚗 Quản lý xe</button>
       </Link>
 
@@ -17,33 +17,33 @@ function Sidebar() {
           CONTENT RESEARCH
       ================================= */}
 
-      <Link to="/content-library">
+      <Link to="/content-library" onClick={onClose}>
         <button>📚 Thư viện bài mẫu</button>
       </Link>
 
-      <Link to="/facebook/groups">
+      <Link to="/facebook/groups" onClick={onClose}>
         <button>👥 Facebook Groups</button>
       </Link>
 
-      <Link to="/facebook/queue">
+      <Link to="/facebook/queue" onClick={onClose}>
         <button>📋 Facebook Queue</button>
       </Link>
 
-      <Link to="/campaign">
+      <Link to="/campaign" onClick={onClose}>
         <button>📣 Facebook Campaign</button>
       </Link>
 
-      <Link to="/facebook/accounts">
+      <Link to="/facebook/accounts" onClick={onClose}>
         <button>👤 Facebook Accounts</button>
       </Link>
 
-      <Link to="/customers">
+      <Link to="/customers" onClick={onClose}>
         <button>👥 Khách hàng</button>
       </Link>
 
       <button>📊 Báo cáo</button>
 
-      <Link to="/settings">
+      <Link to="/settings" onClick={onClose}>
         <button>⚙️ Cài đặt</button>
       </Link>
     </aside>
