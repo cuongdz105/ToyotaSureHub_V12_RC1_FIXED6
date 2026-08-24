@@ -228,12 +228,14 @@ async function generateContent(
 // =======================================
 
 export async function generateFacebookPost(
-  car
+  car,
+  researchContext = ""
 ) {
   return generateContent(
     car,
     "facebook",
-    facebookPrompt
+    facebookPrompt,
+    researchContext
   );
 }
 
