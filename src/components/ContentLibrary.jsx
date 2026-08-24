@@ -34,6 +34,10 @@ import {
     deleteContentSample,
 } from "../services/contentLibraryService";
 
+import {
+    analyzeAndSaveContentSample,
+} from "../services/contentAnalyzerService";
+
 import YouTubeResearchPanel from "./YouTubeResearchPanel";
 
 
@@ -383,6 +387,12 @@ function ContentLibrary() {
         showYouTubeResearch,
         setShowYouTubeResearch,
     ] = useState(false);
+
+
+    const [
+        analyzingId,
+        setAnalyzingId,
+    ] = useState(null);
 
 
     // ===================================
@@ -937,6 +947,48 @@ function ContentLibrary() {
 
 
         setShowForm(true);
+
+    }
+
+
+    // ===================================
+    // ANALYZE
+    // ===================================
+
+    async function handleAnalyze(
+        id
+    ) {
+
+        try {
+
+            setAnalyzingId(
+                id
+            );
+
+            await analyzeAndSaveContentSample(
+                id
+            );
+
+            await refreshLibrary();
+
+        } catch (error) {
+
+            console.error(
+                "Content Library Analyze Error:",
+                error
+            );
+
+            alert(
+                "❌ Không phân tích được bài mẫu."
+            );
+
+        } finally {
+
+            setAnalyzingId(
+                null
+            );
+
+        }
 
     }
 
@@ -2484,9 +2536,13 @@ function ContentLibrary() {
 
                                                 <button
                                                     type="button"
+                                                    disabled={
+                                                        analyzingId ===
+                                                        item.id
+                                                    }
                                                     onClick={() =>
-                                                        alert(
-                                                            "🧠 Research Engine sẽ được nối ở bước tiếp theo."
+                                                        handleAnalyze(
+                                                            item.id
                                                         )
                                                     }
                                                     style={{
@@ -2499,16 +2555,25 @@ function ContentLibrary() {
                                                         padding:
                                                             "9px 6px",
                                                         background:
-                                                            "#111827",
+                                                            analyzingId ===
+                                                            item.id
+                                                                ? "#555"
+                                                                : "#111827",
                                                         color:
                                                             "#fff",
                                                         fontWeight:
                                                             700,
                                                         cursor:
-                                                            "pointer",
+                                                            analyzingId ===
+                                                            item.id
+                                                                ? "not-allowed"
+                                                                : "pointer",
                                                     }}
                                                 >
-                                                    🧠 Phân tích
+                                                    {analyzingId ===
+                                                    item.id
+                                                        ? "⏳ Đang phân tích..."
+                                                        : "🧠 Phân tích"}
                                                 </button>
 
 
