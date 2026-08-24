@@ -35,6 +35,11 @@ import {
     generateFacebookPost,
 } from "../../services/aiService";
 
+import {
+    findResearchSamples,
+    buildResearchContext,
+} from "../../services/contentResearchService";
+
 
 function FacebookPostPreview() {
 
@@ -809,9 +814,22 @@ function handleClearSelectedGroups() {
             );
 
 
+            const researchSamples =
+                await findResearchSamples(
+                    postingCar,
+                    "facebook",
+                    5
+                );
+
+            const researchContext =
+                buildResearchContext(
+                    researchSamples
+                );
+
             const result =
                 await generateFacebookPost(
-                    postingCar
+                    postingCar,
+                    researchContext
                 );
 
 
@@ -1437,7 +1455,7 @@ const priceTeaser =
 
 const priceLine =
     priceTeaser
-        ? `💰 Giá chỉ ${priceTeaser} – chi tiết liên hệ Cương đẹp zai: 0933.666.980`
+        ? `💰 Giá chỉ ${priceTeaser}`
         : "";
 
     // --------------------------------------
