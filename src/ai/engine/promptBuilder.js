@@ -6,7 +6,8 @@ import { loadKnowledge } from "../knowledgeLoader";
 export function buildPrompt(
   car,
   template,
-  researchContext = ""
+  researchContext = "",
+  personalStyle = ""
 ) {
   const dna = buildDNA("facebook");
   const memory = buildMemoryPrompt();
@@ -39,6 +40,28 @@ QUY TẮC SỬ DỤNG DỮ LIỆU NGHIÊN CỨU:
 `
       : "";
 
+  const personalStyleBlock =
+    personalStyle
+      ? `
+==================================================
+GIỌNG VĂN CÁ NHÂN CỦA NGƯỜI BÁN
+==================================================
+
+${personalStyle}
+
+QUY TẮC SỬ DỤNG GIỌNG VĂN CÁ NHÂN:
+
+- Đây là cách diễn đạt, từ ngữ, nhịp câu mà
+  người bán THỰC SỰ dùng (đúc kết từ chính các
+  bài họ đã tự tay chỉnh sửa).
+- Hãy VIẾT THEO đúng giọng văn này — từ ngữ,
+  cách xưng hô, độ dài câu, mức độ dùng emoji.
+- Đây là ưu tiên cao nhất về cách diễn đạt,
+  cao hơn cả dữ liệu nghiên cứu ở trên (nếu có
+  mâu thuẫn, ưu tiên giọng văn cá nhân).
+`
+      : "";
+
   return `
 ${dna}
 
@@ -51,6 +74,8 @@ ${knowledge}
 ${memory}
 
 ${researchBlock}
+
+${personalStyleBlock}
 
 ==================================================
 THÔNG TIN XE
@@ -101,6 +126,9 @@ Nếu có thể kể chuyện thay vì liệt kê, hãy kể.
 Nếu có dữ liệu nghiên cứu ở trên:
 hãy học tư duy triển khai của các mẫu tốt,
 nhưng phải tạo nội dung mới cho chiếc xe này.
+
+Nếu có giọng văn cá nhân ở trên:
+hãy viết đúng theo giọng văn đó.
 
 Mục tiêu là khiến người xem muốn tiếp tục
 xem / đọc và cuối cùng muốn nhắn tin.

@@ -1,6 +1,6 @@
 // ================================
 // Toyota AI Service
-// Version 2.3
+// Version 2.4 — thêm học văn phong cá nhân
 // ================================
 
 import { buildPrompt } from "../ai/engine/promptBuilder";
@@ -17,6 +17,7 @@ import salesChatPrompt from "../ai/prompts/salesChat";
 
 import { saveHistory } from "./historyService";
 import { addMemory } from "../ai/memory/memoryEngine";
+import { getPersonalStyleRules } from "./styleLearningService";
 
 import {
   formatOdoVan,
@@ -41,25 +42,6 @@ function buildAICar(car) {
 // =======================================
 // FACEBOOK PRICE SAFETY
 // =======================================
-// ToyotaSureHub:
-// - KHÔNG cho Facebook xuất giá chính xác.
-// - Nếu AI viết giá chính xác thì tự động loại bỏ.
-// - Giá teaser như 4xx / 5xx vẫn được giữ nguyên.
-//
-// Ví dụ bị loại:
-// 480 triệu
-// 480tr
-// 480 tr
-// 480.000.000
-// 480,000,000
-// 480 triệu đồng
-//
-// Ví dụ được giữ:
-// 4xx
-// 5xx
-// "Giá cực tốt"
-// "Liên hệ em để biết giá"
-// =======================================
 
 function sanitizeFacebookContent(content) {
   if (typeof content !== "string") {
@@ -68,66 +50,30 @@ function sanitizeFacebookContent(content) {
 
   let result = content;
 
-  // ---------------------------------------
-  // 1. Xóa các câu chứa giá chính xác
-  // ---------------------------------------
-  //
-  // Ví dụ:
-  // "Giá đang để 480 triệu."
-  // "Giá xe: 480 triệu"
-  // "Giá 480tr"
-  //
-  // Xóa cả câu để không còn câu cụt kiểu:
-  // "Giá đang để ."
-  //
-
   result = result.replace(
     /(?:^|\n)\s*(?:💰\s*)?(?:giá|giá xe|mức giá)\s*(?::|-)?\s*(?:đang\s*)?(?:để|bán|chỉ|còn)?\s*\d{1,4}(?:[.,]\d{3})*(?:\s*)(?:triệu|tr|vnđ|vnd)(?:\s*đồng)?[^\n]*/gim,
     ""
   );
-
-  // ---------------------------------------
-  // 2. Xóa dạng:
-  // "Giá: 480 triệu"
-  // "Giá 480tr"
-  // ---------------------------------------
 
   result = result.replace(
     /\b(?:giá|giá xe|mức giá)\s*(?::|-)?\s*\d{1,4}(?:[.,]\d{3})*(?:\s*)(?:triệu|tr|vnđ|vnd)(?:\s*đồng)?\b[^\n]*/gim,
     ""
   );
 
-  // ---------------------------------------
-  // 3. Xóa số tiền dạng 480.000.000
-  // ---------------------------------------
-
   result = result.replace(
     /\b\d{1,4}(?:[.,]\d{3}){2}\b/g,
     ""
   );
-
-  // ---------------------------------------
-  // 4. Xóa giá dạng 480 triệu / 480tr
-  // ---------------------------------------
 
   result = result.replace(
     /\b\d{1,4}(?:[.,]\d{3})*(?:\s*)(?:triệu|tr|vnđ|vnd)(?:\s*đồng)?\b/gi,
     ""
   );
 
-  // ---------------------------------------
-  // 5. Dọn những câu "Giá đang để..."
-  // nếu sau khi lọc vẫn còn sót lại.
-  // ---------------------------------------
-
   result = result.replace(
     /(?:^|\n)\s*(?:💰\s*)?(?:giá|giá xe|mức giá)\s*(?::|-)?\s*(?:đang\s*)?(?:để|bán|chỉ|còn)?\s*[\.\-,:;]?\s*(?=\n|$)/gim,
     ""
   );
-
-  // ---------------------------------------
-  // 6. Dọn khoảng trắng / dòng trống dư
-  // ---------------------------------------
 
   result = result
     .replace(/[ \t]{2,}/g, " ")
@@ -147,7 +93,8 @@ async function generateContent(
   car,
   type,
   template,
-  researchContext = ""
+  researchContext = "",
+  personalStyle = ""
 ) {
   const aiCar =
     buildAICar(car);
@@ -156,12 +103,9 @@ async function generateContent(
     buildPrompt(
       aiCar,
       template,
-      researchContext
+      researchContext,
+      personalStyle
     );
-
-  // ---------------------------------------
-  // Gọi AI
-  // ---------------------------------------
 
   let result =
     await runAI(
@@ -169,19 +113,10 @@ async function generateContent(
       aiCar
     );
 
-  // ---------------------------------------
-  // FACEBOOK:
-  // Lọc giá chính xác sau khi AI trả kết quả.
-  // ---------------------------------------
-
   if (type === "facebook") {
     result =
       sanitizeFacebookContent(result);
   }
-
-  // ---------------------------------------
-  // Lưu lịch sử AI
-  // ---------------------------------------
 
   saveHistory({
     type,
@@ -197,10 +132,6 @@ async function generateContent(
     "AI Result:",
     result
   );
-
-  // ---------------------------------------
-  // AI Memory
-  // ---------------------------------------
 
   addMemory({
     type,
@@ -224,10 +155,19 @@ async function generateContent(
 export async function generateFacebookPost(
   car
 ) {
+  let personalStyle = "";
+  try {
+    personalStyle = await getPersonalStyleRules("facebook_post");
+  } catch (error) {
+    console.error("Không lấy được quy tắc văn phong cá nhân:", error);
+  }
+
   return generateContent(
     car,
     "facebook",
-    facebookPrompt
+    facebookPrompt,
+    "",
+    personalStyle
   );
 }
 

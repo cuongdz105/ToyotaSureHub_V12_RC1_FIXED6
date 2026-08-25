@@ -35,6 +35,10 @@ import {
     generateFacebookPost,
 } from "../../services/aiService";
 
+import {
+    learnFromEdit,
+} from "../../services/styleLearningService";
+
 
 function FacebookPostPreview() {
 
@@ -59,6 +63,12 @@ function FacebookPostPreview() {
         useState("");
 
     const [content, setContent] =
+        useState("");
+
+    // Lưu lại bản AI viết ra ban đầu (trước khi ông sửa)
+    // Dùng để so sánh với bản đã sửa, phục vụ tính năng
+    // học văn phong cá nhân.
+    const [aiOriginalContent, setAiOriginalContent] =
         useState("");
 
     const [addingToQueue, setAddingToQueue] =
@@ -90,6 +100,7 @@ function FacebookPostPreview() {
         }
         if (car.aiContent?.facebook) {
           setContent(car.aiContent.facebook);
+          setAiOriginalContent(car.aiContent.facebook);
         }
       }
 
@@ -864,6 +875,12 @@ function handleClearSelectedGroups() {
                 generatedContent.trim()
             );
 
+            // Lưu lại bản AI gốc để sau này so sánh
+            // với bản ông sửa, phục vụ học văn phong.
+            setAiOriginalContent(
+                generatedContent.trim()
+            );
+
 
             alert(
                 "🤖 Đã tạo nội dung Facebook bằng AI."
@@ -1007,6 +1024,31 @@ function handleClearSelectedGroups() {
             setAddingToQueue(
                 true
             );
+
+
+            // ==========================================
+            // HỌC VĂN PHONG TỪ LẦN SỬA NÀY
+            // ==========================================
+            //
+            // So sánh bản AI viết gốc với bản ông vừa
+            // sửa (content hiện tại). Chạy ngầm, không
+            // chặn luồng tạo Campaign nếu lỗi.
+            // ==========================================
+
+            if (aiOriginalContent) {
+
+                learnFromEdit({
+                    original: aiOriginalContent,
+                    edited: content.trim(),
+                    carId: postingCar.id,
+                }).catch((error) => {
+                    console.error(
+                        "Lỗi học văn phong cá nhân:",
+                        error
+                    );
+                });
+            }
+
 
 // ==========================================
 // VARIATION ENGINE V2
