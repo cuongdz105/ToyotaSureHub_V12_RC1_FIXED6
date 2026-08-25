@@ -3,7 +3,6 @@ import { diffWords } from "https://esm.sh/diff@5.2.0";
 
 const RATIO_THRESHOLD = 0.15;
 const REBUILD_EVERY_N_EDITS = 20;
-const CHEAP_MODEL = "gpt-5.6-luna";
 
 function calcEditRatio(original, edited) {
   const changes = diffWords(original, edited);
@@ -16,18 +15,22 @@ function calcEditRatio(original, edited) {
   return totalWords === 0 ? 0 : changedWords / totalWords;
 }
 
+// Gọi qua Supabase Edge Function "generate-ai" (không gọi thẳng
+// api.anthropic.com từ trình duyệt, vì sẽ bị chặn CORS và lộ API key).
 async function callAI(prompt) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: CHEAP_MODEL,
-      max_tokens: 300,
-      messages: [{ role: "user", content: prompt }],
-    }),
+  const { data, error } = await supabase.functions.invoke("generate-ai", {
+    body: {
+      prompt,
+      maxTokens: 300,
+    },
   });
-  const data = await res.json();
-  return data.content.find((c) => c.type === "text")?.text || "";
+
+  if (error) {
+    console.error("Lỗi gọi generate-ai:", error);
+    return "";
+  }
+
+  return data?.output_text || "";
 }
 
 async function quickUpdateRules(contentType, currentRules, original, edited, editsCount) {
@@ -36,6 +39,9 @@ async function quickUpdateRules(contentType, currentRules, original, edited, edi
     `Bài AI viết:\n${original}\n\nBài sau khi biên tập:\n${edited}\n\n` +
     `Cập nhật quy tắc (giữ điểm còn đúng, thêm điểm mới, tối đa 7 gạch đầu dòng).`
   );
+
+  if (!rules) return;
+
   await supabase.from("style_profile").upsert({
     content_type: contentType,
     rules,
@@ -61,6 +67,8 @@ async function rebuildRulesFromScratch(contentType) {
     `Đây là các bài viết gần nhất (đã biên tập):\n\n${samplesText}\n\n` +
     `Tóm tắt lại TOÀN BỘ quy tắc văn phong từ đầu (tối đa 7 gạch đầu dòng).`
   );
+
+  if (!rules) return;
 
   await supabase.from("style_profile").upsert({
     content_type: contentType,
