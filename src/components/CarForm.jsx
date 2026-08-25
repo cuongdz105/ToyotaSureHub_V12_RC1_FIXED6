@@ -61,6 +61,13 @@ function CarForm({ editCar }) {
 
 
   // ==========================================
+  // SAVE STATE (chống bấm Lưu nhiều lần)
+  // ==========================================
+
+  const [saving, setSaving] = useState(false);
+
+
+  // ==========================================
   // BRAND / MODEL / VERSION
   // ==========================================
 
@@ -213,6 +220,11 @@ function CarForm({ editCar }) {
 
   async function handleSave() {
 
+    if (saving) {
+      return;
+    }
+
+
     if (!car.brand) {
 
       alert("Chọn hãng xe");
@@ -237,80 +249,91 @@ function CarForm({ editCar }) {
     }
 
 
-    // ==========================================
-    // LƯU XE
-    // ==========================================
+    setSaving(true);
 
-    if (editCar) {
 
-      try {
-        await updateCar(car.id, car);
-        alert("✅ Đã cập nhật xe");
-      } catch (error) {
-        console.error("Update car error:", error);
-        alert(`❌ Không thể cập nhật xe: ${error?.message || error}`);
+    try {
+
+      // ==========================================
+      // LƯU XE
+      // ==========================================
+
+      if (editCar) {
+
+        try {
+          await updateCar(car.id, car);
+          alert("✅ Đã cập nhật xe");
+        } catch (error) {
+          console.error("Update car error:", error);
+          alert(`❌ Không thể cập nhật xe: ${error?.message || error}`);
+          return;
+        }
+
+      } else {
+
+        try {
+
+          await addCar(car);
+
+          alert(
+            "✅ Đã thêm xe vào Supabase"
+          );
+
+        } catch (error) {
+
+          console.error(
+            "Create car Supabase error:",
+            error
+          );
+
+          alert(
+            `❌ Không thể lưu xe: ${
+              error.message || "Lỗi Supabase"
+            }`
+          );
+
+          return;
+        }
+      }
+
+
+      // ==========================================
+      // NẾU ĐI TỪ FACEBOOK QUEUE
+      // ==========================================
+
+      const returnTo =
+        searchParams.get("returnTo");
+
+      const jobId =
+        searchParams.get("jobId");
+
+
+      if (returnTo === "queue") {
+
+        const queueUrl = jobId
+          ? `/facebook/queue?focusJobId=${encodeURIComponent(
+              jobId
+            )}`
+          : "/facebook/queue";
+
+
+        navigate(queueUrl);
+
         return;
       }
 
-    } else {
 
-  try {
+      // ==========================================
+      // LUỒNG SỬA / THÊM XE BÌNH THƯỜNG
+      // ==========================================
 
-    await addCar(car);
+      navigate("/cars");
 
-    alert(
-      "✅ Đã thêm xe vào Supabase"
-    );
+    } finally {
 
-  } catch (error) {
+      setSaving(false);
 
-    console.error(
-      "Create car Supabase error:",
-      error
-    );
-
-    alert(
-      `❌ Không thể lưu xe: ${
-        error.message || "Lỗi Supabase"
-      }`
-    );
-
-    return;
-  }
-}
-
-
-    // ==========================================
-    // NẾU ĐI TỪ FACEBOOK QUEUE
-    // ==========================================
-
-    const returnTo =
-      searchParams.get("returnTo");
-
-    const jobId =
-      searchParams.get("jobId");
-
-
-    if (returnTo === "queue") {
-
-      const queueUrl = jobId
-        ? `/facebook/queue?focusJobId=${encodeURIComponent(
-            jobId
-          )}`
-        : "/facebook/queue";
-
-
-      navigate(queueUrl);
-
-      return;
     }
-
-
-    // ==========================================
-    // LUỒNG SỬA / THÊM XE BÌNH THƯỜNG
-    // ==========================================
-
-    navigate("/cars");
 
   }
 
@@ -976,9 +999,14 @@ function CarForm({ editCar }) {
         type="button"
         className="save-btn"
         onClick={handleSave}
+        disabled={saving}
+        style={{
+          opacity: saving ? 0.6 : 1,
+          cursor: saving ? "not-allowed" : "pointer",
+        }}
       >
 
-        💾 Lưu xe
+        {saving ? "⏳ Đang lưu..." : "💾 Lưu xe"}
 
       </button>
 

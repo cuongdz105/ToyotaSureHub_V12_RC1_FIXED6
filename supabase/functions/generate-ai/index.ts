@@ -27,6 +27,25 @@ Deno.serve(async (req: Request) => {
     const prompt = typeof body?.prompt === "string" ? body.prompt.trim() : "";
     if (!prompt) return json({ error: "Prompt không được để trống." }, 400);
 
+    const images: string[] = Array.isArray(body?.images) ? body.images : [];
+
+    let input: any = prompt;
+
+    if (images.length > 0) {
+      input = [
+        {
+          role: "user",
+          content: [
+            { type: "input_text", text: prompt },
+            ...images.map((url) => ({
+              type: "input_image",
+              image_url: url,
+            })),
+          ],
+        },
+      ];
+    }
+
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
@@ -35,7 +54,7 @@ Deno.serve(async (req: Request) => {
       },
       body: JSON.stringify({
         model: body?.model || "gpt-5.5",
-        input: prompt,
+        input,
         max_output_tokens: body?.maxTokens ?? 3000,
       }),
     });

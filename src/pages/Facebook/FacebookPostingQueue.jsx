@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useNavigate } from "react-router-dom";
 
 import SectionCard from "../../components/Common/SectionCard";
 import PrimaryButton from "../../components/Common/PrimaryButton";
+
+import { getStoreSnapshot, subscribe } from "../../services/appDataStore";
 
 import {
     loadPostingQueue,
@@ -63,18 +65,13 @@ function FacebookPostingQueue() {
 
     const navigate = useNavigate();
 
-    const [queue, setQueue] = useState([]);
-
-    const [cars, setCars] = useState([]);
-
-    const [stats, setStats] = useState({
-        total: 0,
-        waiting: 0,
-        processing: 0,
-        manualReady: 0,
-        success: 0,
-        failed: 0,
-    });
+    // Đọc trực tiếp từ appDataStore (nguồn sự thật duy nhất).
+    // Trang này tự re-render ngay khi Queue thay đổi ở bất kỳ đâu
+    // trong app (không cần refresh thủ công / không bị dữ liệu cũ).
+    const snapshot = useSyncExternalStore(subscribe, getStoreSnapshot, getStoreSnapshot);
+    const queue = snapshot.queue;
+    const cars = snapshot.cars;
+    const stats = getQueueStats();
 
     const [processing, setProcessing] =
         useState(false);
@@ -89,23 +86,10 @@ function FacebookPostingQueue() {
     // REFRESH
     // ==========================================
 
-    function refresh() {
-
-        setQueue(
-            loadPostingQueue()
-        );
-
-        setStats(
-            getQueueStats()
-        );
-
-        setCars(loadCars());
-    }
-
-
-    useEffect(() => {
-        refresh();
-    }, []);
+    // Dữ liệu Queue/Cars/Stats giờ đến từ appDataStore (xem useSyncExternalStore
+    // ở trên) nên luôn tự cập nhật. Hàm refresh() được giữ lại làm no-op để các
+    // chỗ gọi refresh() bên dưới (sau khi xử lý/xoá Job...) không bị lỗi.
+    function refresh() {}
 
 
     // ==========================================
@@ -582,7 +566,7 @@ function handleDownloadImage(image, job, index) {
         }
 
         try {
-            const prepared = prepareManualPostingJob(job.id);
+            const prepared = await prepareManualPostingJob(job.id);
 
             // Copy sẵn caption vào clipboard ngay từ thao tác của ông.
             // Khi Facebook mở ra, ông chỉ cần Ctrl+V.
@@ -810,16 +794,16 @@ function handleDownloadImage(image, job, index) {
 
 
             /**
-             * FAILED → WAITING
+             * FAILED → PENDING
              *
-             * Worker chỉ nhận Job WAITING.
+             * Worker chỉ nhận Job PENDING.
              */
 
             updateQueueJob(
                 job.id,
                 {
                     status:
-                        "waiting",
+                        "pending",
 
                     error:
                         null,
@@ -1184,7 +1168,7 @@ function handleDownloadImage(image, job, index) {
             queue.find(
                 (job) =>
                     job.status ===
-                    "waiting"
+                    "pending"
             );
 
 
@@ -1227,7 +1211,7 @@ function handleDownloadImage(image, job, index) {
 
         switch (status) {
 
-            case "waiting":
+            case "pending":
                 return "🟡 Chờ xử lý";
 
             case "processing":
@@ -1256,7 +1240,7 @@ function handleDownloadImage(image, job, index) {
         queue.filter(
             (job) =>
                 job.status ===
-                "waiting"
+                "pending"
         );
 
     const failedJobs =
@@ -2521,7 +2505,7 @@ function handleDownloadImage(image, job, index) {
                                     >
 
                                         {job.status ===
-                                            "waiting" && (
+                                            "pending" && (
 
                                             <PrimaryButton
                                                 onClick={() =>

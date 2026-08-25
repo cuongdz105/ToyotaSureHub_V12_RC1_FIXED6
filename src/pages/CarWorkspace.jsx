@@ -345,9 +345,16 @@ const result =
         );
 
 
+        const researchContext =
+          await getResearchContext(
+            "facebook"
+          );
+
+
         const result =
           await generateFacebookPost(
-            car
+            car,
+            researchContext
           );
 
 

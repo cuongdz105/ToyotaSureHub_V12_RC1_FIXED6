@@ -1,223 +1,139 @@
 // =======================================
 // Toyota AI Vision Service
-// V11
-// =======================================
-//
-// Giai đoạn 1:
-// - Mock Vision
-// - Không gọi API
-// - Không tốn tiền
-//
-// Flow:
-//
-// Ảnh
-// ↓
-// Mock Vision
-// ↓
-// Vehicle Matcher
-// ↓
-// Kết quả chuẩn theo brands.js
-// ↓
-// CarForm
-//
-// Sau này chỉ cần thay phần Mock Vision
-// bằng Vision API thật.
+// V12 - Vision AI thật
 // =======================================
 
-import {
-  matchVehicleResult,
-} from "../utils/vehicleMatcher";
+import { runAI } from "../ai/engine/aiEngine";
+import { getAITaskConfig } from "../ai/engine/taskConfig";
+import { matchVehicleResult } from "../utils/vehicleMatcher";
 
 
-// =======================================
-// DELAY
-// =======================================
+const MAX_IMAGES_FOR_AI = 4;
 
-function delay(ms) {
-  return new Promise((resolve) =>
-    setTimeout(resolve, ms)
-  );
+
+function buildVisionPrompt() {
+  return `
+Bạn là chuyên gia nhận diện xe Toyota qua ảnh.
+
+Hãy quan sát các ảnh được cung cấp và xác định
+thông tin xe càng chính xác càng tốt.
+
+Trả về DUY NHẤT một JSON hợp lệ, không markdown,
+không giải thích bên ngoài JSON:
+
+{
+  "brand": "Hãng xe, ví dụ Toyota",
+  "model": "Dòng xe, ví dụ Vios, Camry, Corolla Cross",
+  "version": "Phiên bản nếu đoán được, ví dụ G, 1.8G",
+  "year": "Năm sản xuất ước lượng, dạng số",
+  "color": "Màu xe",
+  "odo": "Số km trên đồng hồ nếu ảnh có hiện rõ, để trống nếu không đọc được",
+  "confidence": "Số thập phân từ 0 đến 1, thể hiện độ tin cậy"
+}
+
+Nếu không chắc chắn về 1 trường nào, để trống
+thay vì đoán bừa. Không tự bịa số liệu.
+`.trim();
 }
 
 
-// =======================================
-// MOCK VISION
-// =======================================
+export async function recognizeCarFromImages(images = []) {
 
-function detectFromImages(images = []) {
-
-  const imageCount =
-    Array.isArray(images)
-      ? images.length
-      : 0;
-
-
-  if (imageCount === 0) {
-
-    throw new Error(
-      "Chưa có ảnh để nhận diện."
-    );
-
+  if (!Array.isArray(images) || images.length === 0) {
+    throw new Error("Chưa có ảnh để nhận diện.");
   }
 
+  // ==========================================
+  // Chuyển mảng object ảnh -> mảng URL (string)
+  // ImageUploader lưu mỗi ảnh dạng { id, preview, name }
+  // preview chính là base64 data URL của ảnh
+  //
+  // Chỉ lấy tối đa MAX_IMAGES_FOR_AI ảnh đầu tiên
+  // (ảnh đầu luôn là ảnh bìa, theo cách sắp xếp
+  // của ImageUploader) để tiết kiệm chi phí, thay vì
+  // gửi hết toàn bộ ảnh nội thất/taplo/động cơ...
+  // ==========================================
 
-  /*
-   * MOCK DATA
-   *
-   * Đây vẫn chưa phải Vision AI thật.
-   *
-   * Mục đích hiện tại:
-   *
-   * Ảnh
-   * ↓
-   * Vision
-   * ↓
-   * Matcher
-   * ↓
-   * CarForm
-   */
+  const imageUrls = images
+    .slice(0, MAX_IMAGES_FOR_AI)
+    .map((img) => (typeof img === "string" ? img : img?.preview))
+    .filter(Boolean);
 
-  return {
-
-    brand: "Toyota",
-
-    model: "Vios",
-
-    version: "G",
-
-    year: "2022",
-
-    color: "Trắng",
-
-    odo: "",
-
-    confidence: 0.94,
-
-    imageCount,
-
-    source: "mock",
-
-    notes:
-      "Kết quả mô phỏng để kiểm tra luồng AI nhận diện xe.",
-
-  };
-
-}
-
-
-// =======================================
-// RECOGNIZE CAR
-// =======================================
-
-export async function recognizeCarFromImages(
-  images = []
-) {
+  if (imageUrls.length === 0) {
+    throw new Error("Không đọc được URL ảnh để gửi cho AI.");
+  }
 
   console.log(
     "🤖 Toyota Vision đang phân tích:",
+    imageUrls.length,
+    "/",
     images.length,
-    "ảnh"
+    "ảnh (đã giới hạn để tiết kiệm chi phí)"
   );
 
+  const prompt = buildVisionPrompt();
 
-  // Giả lập thời gian AI xử lý
+  const config = getAITaskConfig("car-recognition");
 
-  await delay(1500);
+  const rawResult = await runAI(prompt, null, {
+    ...config,
+    images: imageUrls,
+  });
 
+  console.log("🤖 Raw Vision Result:", rawResult);
 
-  // =====================================
-  // 1. VISION NHẬN DIỆN THÔ
-  // =====================================
+  let visionResult;
 
-  const visionResult =
-    detectFromImages(images);
+  try {
+    visionResult = JSON.parse(rawResult);
+  } catch (error) {
+    console.error("Vision JSON parse error:", error, rawResult);
+    throw new Error("AI trả về kết quả không đúng định dạng, thử lại giúp con.");
+  }
 
+  const matchedResult = matchVehicleResult(visionResult);
 
-  console.log(
-    "🤖 Raw Vision Result:",
-    visionResult
-  );
+  console.log("🔎 Vehicle Matcher Result:", matchedResult);
 
-
-  // =====================================
-  // 2. VEHICLE MATCHER
-  // =====================================
+  // ==========================================
+  // Chuẩn hóa confidence
   //
-  // Ví dụ Vision trả:
+  // matchedResult.confidence (từ vehicleMatcher.js)
+  // dùng thang 0-100.
   //
-  // Toyota
-  // Vios
-  // G
+  // visionResult.confidence (từ AI thật) dùng thang 0-1.
   //
-  // Matcher sẽ đối chiếu brands.js
-  //
-  // Toyota
-  // ↓
-  // Vios
-  // ↓
-  // G CVT
-  //
-  // =====================================
+  // CarForm.jsx hiển thị theo công thức x100 để ra %,
+  // nên ở đây luôn phải trả về thang 0-1.
+  // ==========================================
 
-  const matchedResult =
-    matchVehicleResult(
-      visionResult
-    );
+    // Ưu tiên độ tin cậy thật của AI (dựa trên việc AI "nhìn" ảnh
+  // có rõ ràng hay không) — chỉ dùng điểm của vehicleMatcher
+  // (dựa trên so khớp text) làm phương án dự phòng, vì cách tính
+  // của matcher quá dễ chạm trần 100% dù ảnh không thực sự rõ.
+  const rawConfidence =
+    typeof visionResult.confidence === "number"
+      ? visionResult.confidence * 100
+      : matchedResult.confidence ?? 0;
 
-
-  console.log(
-    "🔎 Vehicle Matcher Result:",
-    matchedResult
-  );
-
-
-  // =====================================
-  // 3. KẾT QUẢ CUỐI CÙNG
-  // =====================================
+  const normalizedConfidence =
+    rawConfidence > 1 ? rawConfidence / 100 : rawConfidence;
 
   const result = {
-
     ...visionResult,
-
-    brand:
-      matchedResult.brand ||
-      visionResult.brand,
-
-    model:
-      matchedResult.model ||
-      visionResult.model,
-
-    version:
-      matchedResult.version ||
-      visionResult.version,
-
-    year:
-      matchedResult.year ||
-      visionResult.year,
-
-    color:
-      matchedResult.color ||
-      visionResult.color,
-
-    confidence:
-      matchedResult.confidence ||
-      visionResult.confidence,
-
-    matched:
-      matchedResult.matched,
-
-    matcherSource:
-      "vehicleMatcher",
-
+    brand: matchedResult.brand || visionResult.brand,
+    model: matchedResult.model || visionResult.model,
+    version: matchedResult.version || visionResult.version,
+    year: matchedResult.year || visionResult.year,
+    color: matchedResult.color || visionResult.color,
+    confidence: normalizedConfidence,
+    matched: matchedResult.matched,
+    matcherSource: "vehicleMatcher",
+    imageCount: imageUrls.length,
+    source: "openai",
   };
 
-
-  console.log(
-    "🤖 Final Vision Result:",
-    result
-  );
-
+  console.log("🤖 Final Vision Result:", result);
 
   return result;
-
 }

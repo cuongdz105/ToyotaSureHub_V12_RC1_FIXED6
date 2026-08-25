@@ -25,6 +25,7 @@
 
 import { buildAnalysisPrompt } from "./patterns";
 import { runAI } from "../engine/aiEngine";
+import { getAITaskConfig } from "../engine/taskConfig";
 
 
 // =======================================
@@ -70,7 +71,9 @@ export async function analyzeSamples(
 
     const result =
         await runAI(
-            prompt
+            prompt,
+            null,
+            getAITaskConfig("style-analysis")
         );
 
 

@@ -2,8 +2,11 @@ import {
   useEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+
+import { getStoreSnapshot, subscribe } from "../../services/appDataStore";
 
 import {
   loadGroups,
@@ -33,9 +36,11 @@ function FacebookGroups() {
   const location = useLocation();
   const { cars } = useCars();
 
-  const [groups, setGroups] = useState([]);
-
-  const [accounts, setAccounts] = useState([]);
+  // Đọc trực tiếp từ appDataStore — tự re-render khi Groups/Accounts
+  // đổi ở bất kỳ trang nào khác, không cần refresh thủ công.
+  const snapshot = useSyncExternalStore(subscribe, getStoreSnapshot, getStoreSnapshot);
+  const groups = snapshot.groups;
+  const accounts = snapshot.accounts;
 
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
@@ -300,10 +305,10 @@ function findDuplicateGroup(
    * ==========================================
    */
 
-  function refreshData() {
-    setGroups(loadGroups());
-    setAccounts(loadAccounts());
-  }
+  // Groups/Accounts giờ đến từ appDataStore (xem useSyncExternalStore ở trên)
+  // nên luôn tự cập nhật. Giữ hàm này làm no-op để chỗ gọi refreshData()
+  // trong useEffect phía trên không bị lỗi.
+  function refreshData() {}
 
   /*
    * ==========================================

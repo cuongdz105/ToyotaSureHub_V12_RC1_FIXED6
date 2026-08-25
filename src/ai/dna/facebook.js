@@ -37,7 +37,10 @@ Nội dung:
 
 Kết bài:
 
-Cương đẹp zai - Toyota Sure
+Kết thúc bài viết một cách tự nhiên.
 
-0933666980
+KHÔNG tự thêm tên, số điện thoại hay câu kêu gọi
+liên hệ ở cuối bài — hệ thống sẽ tự động thêm phần
+liên hệ (tên + số điện thoại) vào cuối bài rồi, AI
+không cần viết lại phần này.
 `;

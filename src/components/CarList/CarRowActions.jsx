@@ -13,20 +13,6 @@ function CarRowActions({
     navigate("/facebook/post", { state: { carId: car.id } });
   };
 
-  const handleTikTok = () => {
-    console.log(
-      "TikTok Campaign",
-      car
-    );
-  };
-
-  const handleAI = () => {
-    console.log(
-      "AI",
-      car
-    );
-  };
-
   const handleMarkAsSold = () => {
     if (
       typeof onMarkAsSold ===
@@ -60,21 +46,9 @@ function CarRowActions({
       </Button>
 
       <Button
-        onClick={handleAI}
-      >
-        🤖
-      </Button>
-
-      <Button
         onClick={handleFacebook}
       >
         📣
-      </Button>
-
-      <Button
-        onClick={handleTikTok}
-      >
-        🎬
       </Button>
 
       {/* =====================================

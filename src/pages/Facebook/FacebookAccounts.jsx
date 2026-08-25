@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import SectionCard from "../../components/Common/SectionCard";
 import PrimaryButton from "../../components/Common/PrimaryButton";
+
+import { getStoreSnapshot, subscribe } from "../../services/appDataStore";
 
 import {
     loadAccounts,
@@ -20,11 +22,11 @@ function FacebookAccounts() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
 
-    const [accounts, setAccounts] =
-        useState([]);
-
-    const [groups, setGroups] =
-        useState([]);
+    // Đọc trực tiếp từ appDataStore — tự re-render khi Accounts/Groups
+    // đổi ở bất kỳ trang nào khác, không cần refresh thủ công.
+    const snapshot = useSyncExternalStore(subscribe, getStoreSnapshot, getStoreSnapshot);
+    const accounts = snapshot.accounts;
+    const groups = snapshot.groups;
 
     const [name, setName] =
         useState("");
@@ -147,15 +149,10 @@ function FacebookAccounts() {
 
     }, [accounts, searchParams]);
 
-    function refreshData() {
-        setAccounts(
-            loadAccounts()
-        );
-
-        setGroups(
-            loadGroups()
-        );
-    }
+    // Accounts/Groups giờ đến từ appDataStore (xem useSyncExternalStore ở trên)
+    // nên luôn tự cập nhật. Giữ hàm này làm no-op để các chỗ gọi refreshData()
+    // bên dưới không bị lỗi.
+    function refreshData() {}
 
     /*
      * ==========================================
