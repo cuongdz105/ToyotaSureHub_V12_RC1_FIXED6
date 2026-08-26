@@ -1712,14 +1712,15 @@ function handleDownloadImage(image, job, index) {
 
 
                                         <div>
-                                            👤 Account ID:{" "}
-                                            <strong>
-                                                {
-                                                    job.accountId ||
-                                                    "-"
-                                                }
-                                            </strong>
-                                        </div>
+    👤 Tài khoản:{" "}
+    <strong>
+        {
+            job.account?.name ||
+            job.accountId ||
+            "-"
+        }
+    </strong>
+</div>
 
 
                                         <div>
