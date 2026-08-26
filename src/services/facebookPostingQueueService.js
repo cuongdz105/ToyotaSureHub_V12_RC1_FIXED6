@@ -177,6 +177,42 @@ export function clearPostingQueue() {
   void supabase.from("facebook_queue").delete().neq("id", "00000000-0000-0000-0000-000000000000").then(({ error }) => { if (error) console.error("Queue clear error:", error); });
 }
 
+// ==========================================
+// XÓA TOÀN BỘ JOB "THÀNH CÔNG"
+// ==========================================
+//
+// Chỉ dọn dẹp Queue cho gọn.
+// Dữ liệu Báo cáo (posting_reports) đã được
+// ghi độc lập ngay lúc xác nhận đăng — KHÔNG
+// mất khi các Job này bị xóa khỏi đây.
+// ==========================================
+
+export async function clearSuccessJobs() {
+  const successJobs = loadPostingQueue().filter((job) => job.status === "success");
+
+  if (!successJobs.length) {
+    return 0;
+  }
+
+  const ids = successJobs.map((job) => job.id);
+
+  const { error } = await supabase
+    .from("facebook_queue")
+    .delete()
+    .in("id", ids);
+
+  if (error) {
+    throw error;
+  }
+
+  setStoreData(
+    "queue",
+    loadPostingQueue().filter((job) => job.status !== "success")
+  );
+
+  return successJobs.length;
+}
+
 export function getQueueStats() {
   const queue = loadPostingQueue();
   return {

@@ -11,6 +11,7 @@ import {
     updateQueueJob,
     removeQueueJob,
     clearPostingQueue,
+    clearSuccessJobs,
     getQueueStats,
     prepareManualPostingJob,
     confirmManualPosted,
@@ -664,6 +665,39 @@ function handleDownloadImage(image, job, index) {
         clearPostingQueue();
 
         refresh();
+    }
+
+    
+    function handleClearSuccessJobs() {
+
+        const successCount =
+            queue.filter(
+                (job) => job.status === "success"
+            ).length;
+
+        if (successCount === 0) {
+            alert("📭 Không có Job nào đã đăng thành công để xóa.");
+            return;
+        }
+
+        if (
+            !window.confirm(
+                `Xóa ${successCount} Job đã đăng thành công khỏi Queue?\n\n` +
+                "Lưu ý: Dữ liệu trong mục Báo cáo KHÔNG bị ảnh hưởng."
+            )
+        ) {
+            return;
+        }
+
+        clearSuccessJobs()
+            .then(() => refresh())
+            .catch((error) => {
+                console.error("Clear Success Jobs Error:", error);
+                alert(
+                    "❌ Không thể xóa:\n\n" +
+                        (error?.message || "Lỗi không xác định.")
+                );
+            });
     }
 
 
@@ -2632,6 +2666,21 @@ function handleDownloadImage(image, job, index) {
                             {processing
                                 ? "⏳ Đang chuẩn bị..."
                                 : `🟠 Chuẩn bị ${waitingJobs.length} bài`}
+                        </PrimaryButton>
+
+                        <PrimaryButton
+                            onClick={
+                                handleClearSuccessJobs
+                            }
+                            disabled={
+                                processing
+                            }
+                            style={{
+                                background:
+                                    "#43a047",
+                            }}
+                        >
+                            🧹 Xóa Job đã đăng thành công
                         </PrimaryButton>
 
 
