@@ -1,6 +1,7 @@
 import { supabase } from "../lib/supabase";
 import { getStoreState, setStoreData, insertStoreItem, patchStoreItem, removeStoreItem } from "./appDataStore";
 import { isAccountAllowedForGroup, loadAccounts } from "./facebookAccountService";
+import { logPostingReport } from "./reportService";
 
 export function loadPostingQueue() { return getStoreState().queue; }
 
@@ -101,8 +102,31 @@ export function prepareManualPostingJob(jobId) {
   return updateQueueJob(jobId, { status: "manual_ready" });
 }
 
-export function confirmManualPosted(jobId, result = {}) {
-  return updateQueueJob(jobId, { status: "success", result: { ...result, completedAt: new Date().toISOString() } });
+export async function confirmManualPosted(jobId, result = {}) {
+  const job = loadPostingQueue().find((item) => String(item.id) === String(jobId));
+
+  const updated = await updateQueueJob(jobId, {
+    status: "success",
+    result: {
+      ...result,
+      completedAt: new Date().toISOString(),
+      confirmedByUser: true,
+    },
+  });
+
+  if (job) {
+    const car = getStoreState().cars.find(
+      (item) => String(item.id) === String(job.carId)
+    );
+
+    if (car) {
+      logPostingReport({ job, car }).catch((error) => {
+        console.error("Lỗi ghi báo cáo đăng bài:", error);
+      });
+    }
+  }
+
+  return updated;
 }
 
 export function cancelManualPostingJob(jobId) { return updateQueueJob(jobId, { status: "cancelled" }); }

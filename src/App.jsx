@@ -12,6 +12,7 @@ import AIHistory from "./pages/AIHistory";
 import MainLayout from "./layouts/MainLayout";
 import AIWorkspace from "./pages/AIWorkspace";
 import CampaignPage from "./pages/CampaignPage";
+import Report from "./pages/Report";
 
 import FacebookAccounts from "./pages/Facebook/FacebookAccounts";
 import FacebookGroups from "./pages/Facebook/FacebookGroups";
@@ -131,6 +132,10 @@ function App() {
           element={<CampaignPage />}
         />
 
+        <Route
+          path="/report"
+          element={<Report />}
+        />
 
         {/* =================================
             CONTENT LIBRARY

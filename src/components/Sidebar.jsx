@@ -41,7 +41,9 @@ function Sidebar({ isOpen, onClose }) {
         <button>👥 Khách hàng</button>
       </Link>
 
-      <button>📊 Báo cáo</button>
+            <Link to="/report" onClick={onClose}>
+        <button>📊 Báo cáo</button>
+      </Link>
 
       <Link to="/settings" onClick={onClose}>
         <button>⚙️ Cài đặt</button>

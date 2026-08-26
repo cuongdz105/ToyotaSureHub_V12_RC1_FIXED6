@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabase";
+import { logPriceChange } from "./reportService";
 
 
 // ==========================================
@@ -423,6 +424,10 @@ export async function updateCarInSupabase(
   };
 
 
+    const priceChanged =
+    Object.prototype.hasOwnProperty.call(updatedData, "price") &&
+    Number(updatedData.price) !== Number(currentCar.price);
+
   const payload =
     mapCarToSupabase(
       mergedCar
@@ -445,12 +450,19 @@ export async function updateCarInSupabase(
     throw error;
   }
 
-  const updated = mapSupabaseCar(data);
+    const updated = mapSupabaseCar(data);
   if (Object.prototype.hasOwnProperty.call(updatedData, "images")) {
     updated.images = await syncCarImages(id, updatedData.images || []);
   } else {
     updated.images = await getImagesForCar(id);
   }
+
+  if (priceChanged) {
+    logPriceChange(id, Number(updatedData.price)).catch((error) => {
+      console.error("Lỗi ghi lịch sử giá:", error);
+    });
+  }
+
   return updated;
 }
 
