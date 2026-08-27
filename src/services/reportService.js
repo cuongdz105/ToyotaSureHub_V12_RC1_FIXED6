@@ -84,6 +84,37 @@ export async function getCarPriceHistory(carId) {
 }
 
 // ==========================================
+// LẤY "LẦN ĐĂNG GẦN NHẤT" CỦA MỖI XE
+// ==========================================
+//
+// Dùng cho Priority Engine (Dashboard).
+// Đọc từ posting_reports — nguồn VĨNH VIỄN,
+// không bị mất khi ông xóa Job trong Queue.
+// ==========================================
+
+export async function getLastPostedMap() {
+  const { data, error } = await supabase
+    .from("posting_reports")
+    .select("car_id, posted_at");
+
+  if (error) {
+    console.error("Lỗi lấy last posted map:", error);
+    return new Map();
+  }
+
+  const map = new Map();
+  (data || []).forEach((row) => {
+    const key = String(row.car_id);
+    const existing = map.get(key);
+    if (!existing || new Date(row.posted_at) > new Date(existing)) {
+      map.set(key, row.posted_at);
+    }
+  });
+
+  return map;
+}
+
+// ==========================================
 // TỔNG HỢP DỮ LIỆU (tính ở phía client)
 // ==========================================
 

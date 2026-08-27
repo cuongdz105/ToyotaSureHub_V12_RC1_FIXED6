@@ -3,6 +3,7 @@ import { loadPostingQueue } from "./facebookPostingQueueService";
 import { loadCampaigns } from "./facebookCampaignService";
 import { loadAccounts } from "./facebookAccountService";
 import { loadGroups } from "./facebookGroupService";
+import { getLastPostedMap } from "./reportService";
 
 
 const DEFAULT_TARGET_POSTS = 20;
@@ -156,7 +157,8 @@ function getCampaignsForCar(
 
 function getLastPostingDate(
   queue,
-  campaigns
+  campaigns,
+  reportDate
 ) {
 
   const dates = [];
@@ -228,6 +230,17 @@ function getLastPostingDate(
 
     }
   );
+
+
+  // Nguồn VĨNH VIỄN — không mất khi
+  // ông xóa Job "Thành công" khỏi Queue.
+  if (reportDate) {
+
+    dates.push(
+      reportDate
+    );
+
+  }
 
 
   const times =
@@ -544,6 +557,8 @@ export function calculateCarPriority({
 
   groups,
 
+  reportDate = null,
+
 }) {
 
   if (
@@ -678,7 +693,8 @@ export function calculateCarPriority({
   const lastPostingAt =
     getLastPostingDate(
       carQueue,
-      carCampaigns
+      carCampaigns,
+      reportDate
     );
 
 
@@ -905,7 +921,7 @@ export function calculateCarPriority({
 }
 
 
-export function getPriorityTasks() {
+export async function getPriorityTasks() {
 
   /*
   QUAN TRỌNG:
@@ -933,6 +949,10 @@ export function getPriorityTasks() {
     loadGroups();
 
 
+  const lastPostedMap =
+    await getLastPostedMap();
+
+
   return cars
 
     .map(
@@ -948,6 +968,11 @@ export function getPriorityTasks() {
           accounts,
 
           groups,
+
+          reportDate:
+            lastPostedMap.get(
+              String(car.id)
+            ) || null,
 
         })
     )
