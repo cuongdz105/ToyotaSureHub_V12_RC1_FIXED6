@@ -10,7 +10,7 @@ function AIMenu({
 
     onFacebook,
 
-    onYoutubeScript,
+onYoutubeScript,
 
     onYoutubePost,
 
