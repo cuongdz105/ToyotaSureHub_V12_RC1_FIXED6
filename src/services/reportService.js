@@ -1,6 +1,25 @@
 import { supabase } from "../lib/supabase";
 
 // ==========================================
+// ĐỌC HẾT BẢNG, KHÔNG BỊ CẮT Ở 1000 DÒNG
+// Supabase chỉ trả tối đa 1000 dòng mỗi lần đọc,
+// nên phải đọc từng trang rồi gộp lại.
+// ==========================================
+
+const PAGE_SIZE = 1000;
+
+async function fetchAllRows(buildQuery) {
+  const all = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await buildQuery().range(from, from + PAGE_SIZE - 1);
+    if (error) return { data: null, error };
+    all.push(...(data || []));
+    if (!data || data.length < PAGE_SIZE) break;
+  }
+  return { data: all, error: null };
+}
+
+// ==========================================
 // GHI NHẬN 1 LƯỢT ĐĂNG
 // Gọi khi ông xác nhận "Đã đăng thành công"
 // ==========================================
@@ -53,15 +72,17 @@ export async function logPriceChange(carId, price) {
 // ==========================================
 
 export async function getPostingReports(fromDate, toDate) {
-  let query = supabase
-    .from("posting_reports")
-    .select("*")
-    .order("posted_at", { ascending: true });
+  const { data, error } = await fetchAllRows(() => {
+    let query = supabase
+      .from("posting_reports")
+      .select("*")
+      .order("posted_at", { ascending: true })
+      .order("id", { ascending: true });
 
-  if (fromDate) query = query.gte("posted_at", fromDate);
-  if (toDate) query = query.lte("posted_at", toDate);
-
-  const { data, error } = await query;
+    if (fromDate) query = query.gte("posted_at", fromDate);
+    if (toDate) query = query.lte("posted_at", toDate);
+    return query;
+  });
   if (error) {
     console.error("Lỗi lấy posting_reports:", error);
     return [];
@@ -93,9 +114,13 @@ export async function getCarPriceHistory(carId) {
 // ==========================================
 
 export async function getLastPostedMap() {
-  const { data, error } = await supabase
-    .from("posting_reports")
-    .select("car_id, posted_at");
+  const { data, error } = await fetchAllRows(() =>
+    supabase
+      .from("posting_reports")
+      .select("car_id, posted_at")
+      .order("posted_at", { ascending: false })
+      .order("id", { ascending: true })
+  );
 
   if (error) {
     console.error("Lỗi lấy last posted map:", error);
