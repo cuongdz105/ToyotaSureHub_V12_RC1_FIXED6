@@ -14,6 +14,7 @@ import { getCarById } from "../../services/carService";
 
 import {
     addToPostingQueue,
+    addProfileJobToQueue,
 } from "../../services/facebookPostingQueueService";
 
 import {
@@ -87,6 +88,11 @@ function FacebookPostPreview() {
 
     const [selectedAccountId, setSelectedAccountId] =
         useState("");
+
+    // Đăng thêm 1 bài lên tường cá nhân của tài khoản đang chọn.
+    // Job này do Tiện ích Chrome "ToyotaSureHub Auto Wall" tự đăng.
+    const [postToProfile, setPostToProfile] =
+        useState(false);
 
       
     // ==========================================
@@ -967,11 +973,33 @@ function handleClearSelectedGroups() {
 
         if (
             selectedGroups.length ===
-            0
+            0 &&
+            !postToProfile
         ) {
 
             alert(
-                "⚠️ Chưa chọn nhóm Facebook."
+                "⚠️ Chưa chọn nhóm Facebook hoặc tường cá nhân."
+            );
+
+            return;
+        }
+
+
+        // Ảnh đăng tường phải là link trên máy chủ để
+        // Tiện ích Chrome tải về được.
+        const profileImageUrls =
+            images
+                .map((image) => getImageSrc(image))
+                .filter((src) => /^https?:\/\//.test(src || ""));
+
+        if (
+            postToProfile &&
+            profileImageUrls.length === 0
+        ) {
+
+            alert(
+                "⚠️ Ảnh xe chưa được lưu lên máy chủ nên chưa đăng tường được.\n\n" +
+                "Ông lưu xe lại rồi thử lại nhé."
             );
 
             return;
@@ -1022,6 +1050,8 @@ function handleClearSelectedGroups() {
                 `👤 Facebook: ${selectedAccount.name}\n` +
 
                 `👥 Số nhóm: ${selectedGroups.length}\n` +
+
+                (postToProfile ? `🧱 Đăng thêm lên tường cá nhân (tiện ích Chrome tự đăng)\n` : "") +
 
                `📷 Ảnh: ${images.length}\n` +
 
@@ -1693,9 +1723,13 @@ function createVariationPlan(
             // 1. TẠO CAMPAIGN
             // ======================================
 
+const PROFILE_PLAN_ID = "__profile__";
+
 const variationPlan =
     createVariationPlan(
-        selectedGroups,
+        postToProfile
+            ? [...selectedGroups, { id: PROFILE_PLAN_ID }]
+            : selectedGroups,
         images.length,
         content.trim(),
         postingCar
@@ -1734,6 +1768,9 @@ console.log(
 
                         variationPlan:
     variationPlan,
+
+                    includeProfile:
+                        postToProfile,
 
                 });
 
@@ -1852,6 +1889,56 @@ const job =
 
 
             // ======================================
+            // 2b. JOB TƯỜNG CÁ NHÂN (nếu có tick)
+            // ======================================
+
+            if (postToProfile) {
+
+                const profileVariation =
+                    variationPlan.find(
+                        (item) =>
+                            String(item.groupId) ===
+                            PROFILE_PLAN_ID
+                    ) || null;
+
+                const indexes =
+                    Array.isArray(profileVariation?.imageIndexes)
+                        ? profileVariation.imageIndexes
+                        : [];
+
+                const orderedUrls =
+                    indexes.length > 0
+                        ? indexes
+                              .map((index) => getImageSrc(images[index]))
+                              .filter((src) => /^https?:\/\//.test(src || ""))
+                        : profileImageUrls;
+
+                const profileJob =
+                    await addProfileJobToQueue({
+                        campaignId:
+                            campaign.id,
+                        carId:
+                            postingCar.id,
+                        content:
+                            profileVariation?.content ||
+                            content.trim(),
+                        imageUrls:
+                            orderedUrls.length > 0
+                                ? orderedUrls
+                                : profileImageUrls,
+                        accountId:
+                            String(selectedAccountId || ""),
+                        variation:
+                            profileVariation,
+                    });
+
+                createdJobs.push(
+                    profileJob
+                );
+            }
+
+
+            // ======================================
             // 3. GẮN JOB IDS VÀO CAMPAIGN
             // ======================================
 
@@ -1903,7 +1990,9 @@ const job =
 
                 `👤 Facebook: ${selectedAccount.name}\n` +
 
-                `👥 ${createdJobs.length} nhóm\n` +
+                `👥 ${selectedGroups.length} nhóm\n` +
+
+                (postToProfile ? "🧱 + 1 bài tường cá nhân (tiện ích Chrome sẽ tự đăng)\n" : "") +
 
                 `🆔 Campaign: ${campaign.id}\n\n` +
 
@@ -3179,6 +3268,38 @@ const job =
                     </div>
 
 
+                    <label
+                        style={{
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: "10px",
+                            padding: "12px",
+                            marginTop: "6px",
+                            border: "1px solid #d7e3f4",
+                            background: postToProfile ? "#eef5ff" : "#fafbfc",
+                            borderRadius: "10px",
+                            cursor: "pointer",
+                        }}
+                    >
+                        <input
+                            type="checkbox"
+                            checked={postToProfile}
+                            onChange={(event) =>
+                                setPostToProfile(event.target.checked)
+                            }
+                            style={{ marginTop: "3px", width: "18px", height: "18px" }}
+                        />
+                        <span>
+                            <strong>🧱 Đăng thêm lên tường cá nhân</strong>
+                            {selectedAccount ? ` của ${selectedAccount.name}` : ""}
+                            <br />
+                            <span style={{ fontSize: "13px", color: "#666" }}>
+                                Tiện ích Chrome "ToyotaSureHub Auto Wall" sẽ tự đăng
+                                theo lịch giãn cách. Có thể chỉ đăng tường mà không chọn nhóm.
+                            </span>
+                        </span>
+                    </label>
+
                     <br />
 
                     <PrimaryButton
@@ -3188,8 +3309,8 @@ const job =
                         disabled={
                             addingToQueue ||
                             !selectedAccount ||
-                            selectedGroups.length ===
-                                0 ||
+                            (selectedGroups.length ===
+                                0 && !postToProfile) ||
                             images.length ===
                                 0 ||
                             !content.trim()
@@ -3197,7 +3318,9 @@ const job =
                     >
                         {addingToQueue
                             ? "⏳ Đang tạo Queue..."
-                            : `➕ TẠO QUEUE CHO ${selectedGroups.length} NHÓM`}
+                            : selectedGroups.length > 0
+                                ? `➕ TẠO QUEUE CHO ${selectedGroups.length} NHÓM${postToProfile ? " + TƯỜNG" : ""}`
+                                : "➕ TẠO QUEUE ĐĂNG TƯỜNG CÁ NHÂN"}
                     </PrimaryButton>
 
 

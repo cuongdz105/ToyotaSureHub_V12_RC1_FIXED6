@@ -13,6 +13,8 @@ function rowFromJob(job) {
     group: job.group || null,
     content: job.content || "",
     imageCount: job.imageCount || 0,
+    imageUrls: Array.isArray(job.imageUrls) ? job.imageUrls : [],
+    targetType: job.targetType === "profile" ? "profile" : "group",
     variation: job.variation || null,
     result: job.result || null,
     error: job.error || null,
@@ -20,8 +22,9 @@ function rowFromJob(job) {
   return {
     campaign_id: job.campaignId || null,
     car_id: job.carId || null,
-    group_id: job.groupId || job.group?.id || null,
+    group_id: job.targetType === "profile" ? null : (job.groupId || job.group?.id || null),
     account_id: job.accountId || job.account?.id || null,
+    target_type: job.targetType === "profile" ? "profile" : "group",
     status: job.status || "pending",
     scheduled_at: job.scheduledAt || null,
     attempts: job.attempts || 0,
@@ -30,10 +33,33 @@ function rowFromJob(job) {
   };
 }
 
+function jobFromRow(data) {
+  return { id: data.id, ...data.payload, campaignId: data.campaign_id, carId: data.car_id, groupId: data.group_id, accountId: data.account_id, targetType: data.target_type || data.payload?.targetType || "group", status: data.status, scheduledAt: data.scheduled_at, attempts: data.attempts, errorReason: data.error_reason, createdAt: data.created_at, updatedAt: data.updated_at };
+}
+
+export function isProfileJob(job) {
+  return job?.targetType === "profile";
+}
+
+// Tên đích đăng để hiển thị: tên nhóm hoặc "Tường cá nhân"
+export function getJobTargetName(job) {
+  if (isProfileJob(job)) return `🧱 Tường cá nhân${job.account?.name ? ` — ${job.account.name}` : ""}`;
+  return job?.group?.name || "Không rõ nhóm";
+}
+
+// Link mở Facebook cho Job: link nhóm, hoặc trang cá nhân của tài khoản
+export function getJobTargetUrl(job) {
+  if (isProfileJob(job)) {
+    const account = loadAccounts().find((item) => String(item.id) === String(job.accountId)) || job.account;
+    return account?.profileUrl || "https://www.facebook.com/me";
+  }
+  return job?.group?.url || "";
+}
+
 function persist(job) {
   return supabase.from("facebook_queue").update(rowFromJob(job)).eq("id", job.id).select("*").single().then(({ data, error }) => {
     if (error) throw error;
-    return { id: data.id, ...data.payload, campaignId: data.campaign_id, carId: data.car_id, groupId: data.group_id, accountId: data.account_id, status: data.status, scheduledAt: data.scheduled_at, attempts: data.attempts, errorReason: data.error_reason, createdAt: data.created_at, updatedAt: data.updated_at };
+    return jobFromRow(data);
   });
 }
 
@@ -88,6 +114,94 @@ export function addToPostingQueue({ campaignId = null, carId, group, content, im
       patchStoreItem("queue", job.id, () => ({ ...job, id: data.id }));
       return { ...job, id: data.id };
     });
+}
+
+// ==========================================
+// JOB ĐĂNG LÊN TƯỜNG CÁ NHÂN
+// ==========================================
+//
+// Job này do Tiện ích Chrome "ToyotaSureHub Auto Wall"
+// tự nhận và tự đăng (status pending → processing →
+// success / failed). Ông vẫn có thể đăng tay như job nhóm.
+//
+// imageUrls được khóa sẵn lúc tạo để tiện ích không phải
+// tự tính lại thứ tự ảnh theo variation.
+// ==========================================
+
+export function addProfileJobToQueue({ campaignId = null, carId, content, imageUrls = [], accountId = null, variation = null, scheduledAt = null }) {
+  if (!content?.trim()) throw new Error("Nội dung Facebook đang trống.");
+  const urls = (Array.isArray(imageUrls) ? imageUrls : []).filter((url) => typeof url === "string" && /^https?:\/\//.test(url));
+  if (!urls.length) throw new Error("Bài đăng tường chưa có ảnh (ảnh phải đã được lưu lên máy chủ).");
+  const account = loadAccounts().find((item) => String(item.id) === String(accountId));
+  if (!account) throw new Error("Chưa chọn tài khoản Facebook.");
+  if (account.status !== "active") throw new Error("Tài khoản Facebook hiện không hoạt động.");
+
+  const now = new Date().toISOString();
+  const job = {
+    id: crypto.randomUUID(),
+    campaignId: campaignId || null,
+    carId: carId || null,
+    groupId: null,
+    accountId: account.id,
+    targetType: "profile",
+    status: "pending",
+    createdAt: now,
+    updatedAt: now,
+    scheduledAt,
+    attempts: 0,
+    errorReason: "",
+    logs: [
+      { message: "📋 Bài đăng TƯỜNG CÁ NHÂN được thêm vào Queue", timestamp: now },
+      { message: `👤 Tài khoản: ${account.name}`, timestamp: now },
+      { message: "🤖 Chờ Tiện ích Chrome tự đăng", timestamp: now },
+    ],
+    account: { ...account },
+    group: null,
+    content,
+    imageCount: urls.length,
+    imageUrls: urls,
+    variation,
+  };
+  insertStoreItem("queue", job);
+  const { id, ...payload } = rowFromJob(job);
+  return supabase
+    .from("facebook_queue")
+    .insert(payload)
+    .select("*")
+    .single()
+    .then(({ data, error }) => {
+      if (error) {
+        removeStoreItem("queue", job.id);
+        if (String(error.message || "").includes("target_type")) {
+          throw new Error("Database chưa có cột target_type. Ông chạy file supabase/migrations/20261105_profile_wall_posting.sql trong Supabase SQL Editor trước nhé.");
+        }
+        throw error;
+      }
+      patchStoreItem("queue", job.id, () => ({ ...job, id: data.id }));
+      return { ...job, id: data.id };
+    });
+}
+
+// Tiện ích Chrome cập nhật trạng thái job tường trực tiếp trên
+// Supabase → trang Queue gọi hàm này định kỳ để thấy kết quả mới.
+export async function syncProfileJobsFromServer() {
+  const local = loadPostingQueue().filter((job) => isProfileJob(job) && ["pending", "processing"].includes(job.status));
+  if (!local.length) return 0;
+  const { data, error } = await supabase.from("facebook_queue").select("*").in("id", local.map((job) => job.id));
+  if (error) {
+    console.error("Sync profile jobs error:", error);
+    return 0;
+  }
+  let changed = 0;
+  for (const row of data || []) {
+    const fresh = jobFromRow(row);
+    const current = local.find((job) => String(job.id) === String(row.id));
+    if (current && (current.status !== fresh.status || current.updatedAt !== fresh.updatedAt)) {
+      patchStoreItem("queue", row.id, (item) => ({ ...item, ...fresh }));
+      changed += 1;
+    }
+  }
+  return changed;
 }
 
 export function updateQueueJob(jobId, updates = {}) {

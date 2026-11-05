@@ -16,6 +16,10 @@ import {
     prepareManualPostingJob,
     confirmManualPosted,
     cancelManualPostingJob,
+    isProfileJob,
+    getJobTargetName,
+    getJobTargetUrl,
+    syncProfileJobsFromServer,
 } from "../../services/facebookPostingQueueService";
 
 import {
@@ -91,6 +95,34 @@ function FacebookPostingQueue() {
     // ở trên) nên luôn tự cập nhật. Hàm refresh() được giữ lại làm no-op để các
     // chỗ gọi refresh() bên dưới (sau khi xử lý/xoá Job...) không bị lỗi.
     function refresh() {}
+
+
+    // ==========================================
+    // ĐỒNG BỘ JOB TƯỜNG CÁ NHÂN
+    // ==========================================
+    //
+    // Tiện ích Chrome cập nhật trạng thái job tường thẳng
+    // trên Supabase. Cứ 30 giây trang này hỏi lại 1 lần
+    // (chỉ các job tường đang chờ / đang xử lý).
+
+    useEffect(() => {
+        let stopped = false;
+
+        const tick = () => {
+            if (stopped || document.hidden) return;
+            syncProfileJobsFromServer().catch((error) =>
+                console.error("Sync profile jobs:", error)
+            );
+        };
+
+        tick();
+        const timer = window.setInterval(tick, 30000);
+
+        return () => {
+            stopped = true;
+            window.clearInterval(timer);
+        };
+    }, []);
 
 
     // ==========================================
@@ -393,7 +425,7 @@ async function copyImageToClipboard(
 
 
     function handleOpenFacebook(job) {
-        const url = job.group?.url;
+        const url = getJobTargetUrl(job);
 
         if (!url) {
             alert("❌ Job chưa có link Facebook của nhóm.");
@@ -579,9 +611,11 @@ function handleDownloadImage(image, job, index) {
 
             refresh();
 
-            if (prepared?.group?.url) {
+            const targetUrl = getJobTargetUrl(prepared || job);
+
+            if (targetUrl) {
                 window.open(
-                    prepared.group.url,
+                    targetUrl,
                     "_blank",
                     "noopener,noreferrer"
                 );
@@ -1692,9 +1726,8 @@ function handleDownloadImage(image, job, index) {
                                                             Job ID:{" "}
                                                             {job.id}
                                                             {" · "}
-                                                            👥{" "}
-                                                            {job.group?.name ||
-                                                                "Không rõ nhóm"}
+                                                            {isProfileJob(job) ? " " : "👥 "}
+                                                            {getJobTargetName(job)}
                                                         </div>
                                                     </>
                                                 );
@@ -1758,12 +1791,11 @@ function handleDownloadImage(image, job, index) {
 
 
                                         <div>
-                                            👥 Nhóm:{" "}
+                                            {isProfileJob(job) ? "🧱 Đích:" : "👥 Nhóm:"}{" "}
                                             <strong>
-                                                {
-                                                    job.group?.name ||
-                                                    "-"
-                                                }
+                                                {isProfileJob(job)
+                                                    ? "Tường cá nhân (tự động)"
+                                                    : job.group?.name || "-"}
                                             </strong>
                                         </div>
 
@@ -2539,6 +2571,26 @@ function handleDownloadImage(image, job, index) {
                                         }}
                                     >
 
+                                        {isProfileJob(job) &&
+                                            ["pending", "processing"].includes(job.status) && (
+
+                                            <div
+                                                style={{
+                                                    width: "100%",
+                                                    padding: "8px 10px",
+                                                    background: "#eef5ff",
+                                                    border: "1px solid #cfe0fb",
+                                                    borderRadius: "8px",
+                                                    fontSize: "13px",
+                                                }}
+                                            >
+                                                {job.status === "processing"
+                                                    ? "🤖 Tiện ích Chrome đang đăng bài này..."
+                                                    : "🤖 Đang chờ Tiện ích Chrome tự đăng theo lịch. Ông có thể bấm \"Tự đăng tay\" nếu muốn đăng ngay."}
+                                            </div>
+
+                                        )}
+
                                         {job.status ===
                                             "pending" && (
 
@@ -2552,7 +2604,9 @@ function handleDownloadImage(image, job, index) {
                                                     processing
                                                 }
                                             >
-                                                🚀 Xử lý bài này
+                                                {isProfileJob(job)
+                                                    ? "✋ Tự đăng tay"
+                                                    : "🚀 Xử lý bài này"}
                                             </PrimaryButton>
 
                                         )}

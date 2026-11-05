@@ -130,6 +130,7 @@ function mapQueue(row) {
     createdAt: row.created_at || null,
     updatedAt: row.updated_at || null,
     ...(row.payload || {}),
+    targetType: row.target_type || row.payload?.targetType || "group",
   };
 }
 

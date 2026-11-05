@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <title>ToyotaSureHub Auto Wall</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header>
+    <img src="icons/icon48.png" alt="" width="28" height="28" />
+    <div>
+      <h1>ToyotaSureHub Auto Wall</h1>
+      <p class="sub">Tự đăng bài lên tường cá nhân</p>
+    </div>
+    <label class="switch" title="Bật / tắt tự động đăng">
+      <input type="checkbox" id="enabled" />
+      <span></span>
+    </label>
+  </header>
+
+  <div id="paused" class="banner danger" hidden></div>
+
+  <!-- TRẠNG THÁI -->
+  <section id="statusBox" class="card">
+    <div class="stats">
+      <div><b id="sToday">–</b><span>đã đăng hôm nay</span></div>
+      <div><b id="sPending">–</b><span>bài đang chờ</span></div>
+      <div><b id="sNext">–</b><span>lượt kế tiếp</span></div>
+    </div>
+    <div class="row">
+      <button id="runNow" class="primary">▶ Đăng 1 bài ngay</button>
+      <button id="dryRun">🧪 Chạy thử</button>
+    </div>
+    <p id="runMsg" class="msg"></p>
+  </section>
+
+  <!-- ĐĂNG NHẬP -->
+  <details id="loginBox" class="card">
+    <summary>🔐 Kết nối ToyotaSureHub <span id="whoami" class="muted"></span></summary>
+    <label>Supabase URL<input id="supabaseUrl" type="url" spellcheck="false" /></label>
+    <label>Publishable key<input id="supabaseKey" type="password" spellcheck="false" placeholder="VITE_SUPABASE_PUBLISHABLE_KEY" /></label>
+    <div id="loginFields">
+      <label>Email ToyotaSureHub<input id="email" type="email" autocomplete="username" /></label>
+      <label>Mật khẩu<input id="password" type="password" autocomplete="current-password" /></label>
+    </div>
+    <div class="row">
+      <button id="login" class="primary">Đăng nhập</button>
+      <button id="logout">Đăng xuất</button>
+    </div>
+    <p class="hint">Mật khẩu không được lưu, tiện ích chỉ giữ phiên đăng nhập.</p>
+  </details>
+
+  <!-- CÀI ĐẶT -->
+  <details id="settingsBox" class="card">
+    <summary>⚙️ Cài đặt đăng bài</summary>
+    <label>Tài khoản Facebook của Chrome này
+      <select id="accountId"><option value="">— Đăng nhập để tải danh sách —</option></select>
+    </label>
+    <p class="hint">Mỗi hồ sơ Chrome đăng nhập 1 Facebook → chọn đúng tài khoản tương ứng.</p>
+    <div class="grid2">
+      <label>Tối đa bài/ngày<input id="dailyLimit" type="number" min="1" max="10" /></label>
+      <label>Giờ hoạt động
+        <span class="inline"><input id="activeFrom" type="number" min="0" max="23" /> – <input id="activeTo" type="number" min="1" max="24" /></span>
+      </label>
+      <label>Cách nhau ít nhất (phút)<input id="gapMinMinutes" type="number" min="15" /></label>
+      <label>Cách nhau nhiều nhất (phút)<input id="gapMaxMinutes" type="number" min="15" /></label>
+    </div>
+    <label class="check"><input id="closeWindowOnSuccess" type="checkbox" /> Tự đóng cửa sổ Facebook sau khi đăng xong</label>
+    <button id="save" class="primary full">Lưu cài đặt</button>
+  </details>
+
+  <!-- NHẬT KÝ -->
+  <details class="card" open>
+    <summary>📜 Nhật ký</summary>
+    <ul id="logs"></ul>
+  </details>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

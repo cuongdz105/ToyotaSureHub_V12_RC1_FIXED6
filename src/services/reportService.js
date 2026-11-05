@@ -39,8 +39,9 @@ export async function logPostingReport({ job, car }) {
     price_at_post: car.price || null,
     account_id: job?.accountId || null,
     account_name: job?.account?.name || "",
-    group_id: job?.groupId || job?.group?.id || null,
-    group_name: job?.group?.name || "",
+    group_id: job?.targetType === "profile" ? null : (job?.groupId || job?.group?.id || null),
+    group_name: job?.targetType === "profile" ? "🧱 Tường cá nhân" : (job?.group?.name || ""),
+    target_type: job?.targetType === "profile" ? "profile" : "group",
   };
 
   const { error } = await supabase.from("posting_reports").insert(payload);
