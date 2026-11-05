@@ -17,6 +17,8 @@ import {
     confirmManualPosted,
     cancelManualPostingJob,
     isProfileJob,
+    isPageJob,
+    publishPageJob,
     getJobTargetName,
     getJobTargetUrl,
     syncProfileJobsFromServer,
@@ -629,6 +631,25 @@ function handleDownloadImage(image, job, index) {
                     (error?.message || "Lỗi không xác định.")
             );
             refresh();
+        }
+    }
+
+
+    async function handlePublishPage(job) {
+        if (!window.confirm("Đăng bài này lên Fanpage ngay bây giờ?")) {
+            return;
+        }
+
+        const result = await publishPageJob(job.id);
+
+        if (result?.ok) {
+            alert(
+                result.result?.scheduledFor
+                    ? `🕒 Đã hẹn giờ trên Fanpage: ${new Date(result.result.scheduledFor).toLocaleString("vi-VN")}`
+                    : "✅ Đã đăng lên Fanpage."
+            );
+        } else {
+            alert("❌ Không đăng được Fanpage:\n\n" + (result?.reason || "Lỗi không xác định."));
         }
     }
 
@@ -1791,11 +1812,13 @@ function handleDownloadImage(image, job, index) {
 
 
                                         <div>
-                                            {isProfileJob(job) ? "🧱 Đích:" : "👥 Nhóm:"}{" "}
+                                            {isProfileJob(job) || isPageJob(job) ? "🎯 Đích:" : "👥 Nhóm:"}{" "}
                                             <strong>
                                                 {isProfileJob(job)
                                                     ? "Tường cá nhân (tự động)"
-                                                    : job.group?.name || "-"}
+                                                    : isPageJob(job)
+                                                        ? "Fanpage (API chính thức)"
+                                                        : job.group?.name || "-"}
                                             </strong>
                                         </div>
 
@@ -1908,9 +1931,9 @@ function handleDownloadImage(image, job, index) {
                                                 }}
                                             >
 
-                                                {
-                                                    job.error
-                                                }
+                                                {typeof job.error === "object"
+                                                    ? job.error?.reason || job.errorReason || "Lỗi không rõ"
+                                                    : job.error}
 
                                             </div>
 
@@ -2591,8 +2614,42 @@ function handleDownloadImage(image, job, index) {
 
                                         )}
 
+                                        {isPageJob(job) &&
+                                            ["pending", "failed"].includes(job.status) && (
+
+                                            <PrimaryButton
+                                                onClick={() =>
+                                                    handlePublishPage(
+                                                        job
+                                                    )
+                                                }
+                                                disabled={
+                                                    processing
+                                                }
+                                            >
+                                                📄 Đăng lên Fanpage
+                                            </PrimaryButton>
+
+                                        )}
+
+                                        {isPageJob(job) &&
+                                            job.status === "success" &&
+                                            job.result?.permalink && (
+
+                                            <PrimaryButton
+                                                onClick={() =>
+                                                    window.open(job.result.permalink, "_blank", "noopener,noreferrer")
+                                                }
+                                            >
+                                                {job.result?.scheduledFor
+                                                    ? `🕒 Hẹn ${new Date(job.result.scheduledFor).toLocaleString("vi-VN")} — xem bài`
+                                                    : "🔗 Xem bài trên Fanpage"}
+                                            </PrimaryButton>
+
+                                        )}
+
                                         {job.status ===
-                                            "pending" && (
+                                            "pending" && !isPageJob(job) && (
 
                                             <PrimaryButton
                                                 onClick={() =>
@@ -2629,7 +2686,7 @@ function handleDownloadImage(image, job, index) {
 
 
                                         {job.status ===
-                                            "failed" && (
+                                            "failed" && !isPageJob(job) && (
 
                                             <PrimaryButton
                                                 onClick={() =>

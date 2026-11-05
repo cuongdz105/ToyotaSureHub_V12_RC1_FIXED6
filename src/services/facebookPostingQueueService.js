@@ -5,6 +5,10 @@ import { logPostingReport } from "./reportService";
 
 export function loadPostingQueue() { return getStoreState().queue; }
 
+function normalizeTarget(type) {
+  return type === "profile" || type === "page" ? type : "group";
+}
+
 function rowFromJob(job) {
   const payload = {
     ...(job.payload || {}),
@@ -14,7 +18,7 @@ function rowFromJob(job) {
     content: job.content || "",
     imageCount: job.imageCount || 0,
     imageUrls: Array.isArray(job.imageUrls) ? job.imageUrls : [],
-    targetType: job.targetType === "profile" ? "profile" : "group",
+    targetType: normalizeTarget(job.targetType),
     variation: job.variation || null,
     result: job.result || null,
     error: job.error || null,
@@ -22,9 +26,9 @@ function rowFromJob(job) {
   return {
     campaign_id: job.campaignId || null,
     car_id: job.carId || null,
-    group_id: job.targetType === "profile" ? null : (job.groupId || job.group?.id || null),
+    group_id: normalizeTarget(job.targetType) !== "group" ? null : (job.groupId || job.group?.id || null),
     account_id: job.accountId || job.account?.id || null,
-    target_type: job.targetType === "profile" ? "profile" : "group",
+    target_type: normalizeTarget(job.targetType),
     status: job.status || "pending",
     scheduled_at: job.scheduledAt || null,
     attempts: job.attempts || 0,
@@ -41,14 +45,20 @@ export function isProfileJob(job) {
   return job?.targetType === "profile";
 }
 
-// Tên đích đăng để hiển thị: tên nhóm hoặc "Tường cá nhân"
+export function isPageJob(job) {
+  return job?.targetType === "page";
+}
+
+// Tên đích đăng để hiển thị: tên nhóm, "Tường cá nhân" hoặc "Fanpage"
 export function getJobTargetName(job) {
   if (isProfileJob(job)) return `🧱 Tường cá nhân${job.account?.name ? ` — ${job.account.name}` : ""}`;
+  if (isPageJob(job)) return `📄 Fanpage${job.result?.pageName ? ` ${job.result.pageName}` : ""}`;
   return job?.group?.name || "Không rõ nhóm";
 }
 
-// Link mở Facebook cho Job: link nhóm, hoặc trang cá nhân của tài khoản
+// Link mở Facebook cho Job: link nhóm, trang cá nhân, hoặc bài fanpage đã đăng
 export function getJobTargetUrl(job) {
+  if (isPageJob(job)) return job.result?.permalink || "";
   if (isProfileJob(job)) {
     const account = loadAccounts().find((item) => String(item.id) === String(job.accountId)) || job.account;
     return account?.profileUrl || "https://www.facebook.com/me";
@@ -128,10 +138,21 @@ export function addToPostingQueue({ campaignId = null, carId, group, content, im
 // tự tính lại thứ tự ảnh theo variation.
 // ==========================================
 
-export function addProfileJobToQueue({ campaignId = null, carId, content, imageUrls = [], accountId = null, variation = null, scheduledAt = null }) {
+export function addProfileJobToQueue(options) {
+  return addTargetJobToQueue("profile", options);
+}
+
+// Job Fanpage: đăng qua API chính thức (Edge Function fb-page-post).
+// scheduledAt = giờ hẹn đăng trên Facebook (để trống = đăng ngay).
+export function addPageJobToQueue(options) {
+  return addTargetJobToQueue("page", options);
+}
+
+function addTargetJobToQueue(targetType, { campaignId = null, carId, content, imageUrls = [], accountId = null, variation = null, scheduledAt = null }) {
+  const isPage = targetType === "page";
   if (!content?.trim()) throw new Error("Nội dung Facebook đang trống.");
   const urls = (Array.isArray(imageUrls) ? imageUrls : []).filter((url) => typeof url === "string" && /^https?:\/\//.test(url));
-  if (!urls.length) throw new Error("Bài đăng tường chưa có ảnh (ảnh phải đã được lưu lên máy chủ).");
+  if (!urls.length) throw new Error("Bài đăng chưa có ảnh (ảnh phải đã được lưu lên máy chủ).");
   const account = loadAccounts().find((item) => String(item.id) === String(accountId));
   if (!account) throw new Error("Chưa chọn tài khoản Facebook.");
   if (account.status !== "active") throw new Error("Tài khoản Facebook hiện không hoạt động.");
@@ -143,18 +164,23 @@ export function addProfileJobToQueue({ campaignId = null, carId, content, imageU
     carId: carId || null,
     groupId: null,
     accountId: account.id,
-    targetType: "profile",
+    targetType,
     status: "pending",
     createdAt: now,
     updatedAt: now,
     scheduledAt,
     attempts: 0,
     errorReason: "",
-    logs: [
-      { message: "📋 Bài đăng TƯỜNG CÁ NHÂN được thêm vào Queue", timestamp: now },
-      { message: `👤 Tài khoản: ${account.name}`, timestamp: now },
-      { message: "🤖 Chờ Tiện ích Chrome tự đăng", timestamp: now },
-    ],
+    logs: isPage
+      ? [
+          { message: "📋 Bài đăng FANPAGE được thêm vào Queue", timestamp: now },
+          { message: scheduledAt ? `🕒 Hẹn giờ: ${new Date(scheduledAt).toLocaleString("vi-VN")}` : "⚡ Đăng ngay", timestamp: now },
+        ]
+      : [
+          { message: "📋 Bài đăng TƯỜNG CÁ NHÂN được thêm vào Queue", timestamp: now },
+          { message: `👤 Tài khoản: ${account.name}`, timestamp: now },
+          { message: "🤖 Chờ Tiện ích Chrome tự đăng", timestamp: now },
+        ],
     account: { ...account },
     group: null,
     content,
@@ -173,13 +199,44 @@ export function addProfileJobToQueue({ campaignId = null, carId, content, imageU
       if (error) {
         removeStoreItem("queue", job.id);
         if (String(error.message || "").includes("target_type")) {
-          throw new Error("Database chưa có cột target_type. Ông chạy file supabase/migrations/20261105_profile_wall_posting.sql trong Supabase SQL Editor trước nhé.");
+          throw new Error("Database chưa cho phép loại job này. Ông chạy các file trong supabase/migrations (20261105_...sql) trong Supabase SQL Editor trước nhé.");
         }
         throw error;
       }
       patchStoreItem("queue", job.id, () => ({ ...job, id: data.id }));
       return { ...job, id: data.id };
     });
+}
+
+// Lấy lại 1 job từ Supabase vào store (sau khi máy chủ cập nhật)
+export async function reloadQueueJob(jobId) {
+  const { data, error } = await supabase.from("facebook_queue").select("*").eq("id", jobId).maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const fresh = jobFromRow(data);
+  patchStoreItem("queue", jobId, (item) => ({ ...item, ...fresh }));
+  return fresh;
+}
+
+// Đăng 1 job Fanpage ngay (hoặc gửi lịch hẹn giờ lên Facebook)
+export async function publishPageJob(jobId) {
+  patchStoreItem("queue", jobId, (item) => ({ ...item, status: "processing" }));
+  const { data, error } = await supabase.functions.invoke("fb-page-post", { body: { jobId } });
+  const fresh = await reloadQueueJob(jobId).catch(() => null);
+  if (error) {
+    let reason = error.message || "Không gọi được máy chủ đăng Fanpage.";
+    if (/not found|404/i.test(reason)) reason = "Chưa cài Edge Function fb-page-post trên Supabase.";
+    if (fresh?.status === "processing") patchStoreItem("queue", jobId, (item) => ({ ...item, status: "failed", errorReason: reason }));
+    return { ok: false, reason };
+  }
+  return data || { ok: false, reason: "Máy chủ không trả kết quả." };
+}
+
+// Kiểm tra mã fanpage đã đủ quyền đăng bài chưa
+export async function checkPageToken() {
+  const { data, error } = await supabase.functions.invoke("fb-page-post", { body: { action: "check" } });
+  if (error) return { ok: false, reason: error.message };
+  return data;
 }
 
 // Tiện ích Chrome cập nhật trạng thái job tường trực tiếp trên

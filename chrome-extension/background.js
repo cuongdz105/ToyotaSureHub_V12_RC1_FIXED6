@@ -94,6 +94,13 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "tsh-heartbeat") return false;
 
+  // Script đăng bài báo trang bị ẩn → đưa cửa sổ Facebook lên trước
+  if (message?.type === "tsh-need-focus" && _sender?.tab?.windowId) {
+    chrome.windows.update(_sender.tab.windowId, { focused: true, state: "normal" }).catch(() => {});
+    log("Cửa sổ Facebook bị ẩn → tạm đưa lên trước để đăng cho xong.");
+    return false;
+  }
+
   if (message?.type === "tsh-run-now") {
     tick({ manual: true }).then(sendResponse, (error) => sendResponse({ ok: false, reason: error.message }));
     return true;
@@ -163,7 +170,7 @@ async function tick({ manual }) {
     return { ok: false, reason: "Chưa đến lượt (đang giãn cách)." };
   }
 
-  const job = await pickJob(settings);
+  const job = await pickJob(settings, { ignoreSchedule: manual });
   if (!job) return { ok: false, reason: "Không có job tường cá nhân nào đang chờ." };
 
   await patchState({ busySince: Date.now() });
@@ -174,13 +181,15 @@ async function tick({ manual }) {
   }
 }
 
-async function pickJob(settings) {
+async function pickJob(settings, { ignoreSchedule = false } = {}) {
   const now = new Date().toISOString();
+  // Bấm "Đăng 1 bài ngay" thì lấy cả bài đang hẹn giờ thử lại
+  const scheduleFilter = ignoreSchedule ? "" : `&or=(scheduled_at.is.null,scheduled_at.lte.${encodeURIComponent(now)})`;
   const rows = await rest(
     "GET",
     `facebook_queue?select=*&target_type=eq.profile&status=eq.pending` +
       `&account_id=eq.${encodeURIComponent(settings.accountId)}` +
-      `&or=(scheduled_at.is.null,scheduled_at.lte.${encodeURIComponent(now)})` +
+      scheduleFilter +
       `&order=created_at.asc&limit=5`
   );
   for (const row of rows || []) {

@@ -389,7 +389,9 @@ export function getQueueFixAction(
 
     const type =
         classifyQueueError(
-            job.error
+            typeof job.error === "object" && job.error
+                ? job.error.reason || job.errorReason || ""
+                : job.error
         );
 
 

@@ -14,7 +14,7 @@ alter table public.facebook_queue
 
 alter table public.facebook_queue
   add constraint facebook_queue_target_type_check
-  check (target_type in ('group', 'profile'));
+  check (target_type in ('group', 'profile', 'page'));
 
 -- Job tường cá nhân không có nhóm → cho phép group_id trống
 alter table public.facebook_queue

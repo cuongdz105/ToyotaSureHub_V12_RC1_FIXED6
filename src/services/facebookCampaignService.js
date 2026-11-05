@@ -62,10 +62,10 @@ function persist(campaign) {
   });
 }
 
-export async function createCampaign({ car, account, selectedGroups = [], content = "", imageCount = 0, variationPlan = [], scheduledAt = null, includeProfile = false }) {
+export async function createCampaign({ car, account, selectedGroups = [], content = "", imageCount = 0, variationPlan = [], scheduledAt = null, includeProfile = false, includePage = false }) {
   if (!car?.id) throw new Error("Campaign chưa có xe.");
   if (!account?.id) throw new Error("Campaign chưa có tài khoản Facebook.");
-  if (!selectedGroups.length && !includeProfile) throw new Error("Campaign chưa có nhóm Facebook hoặc tường cá nhân.");
+  if (!selectedGroups.length && !includeProfile && !includePage) throw new Error("Campaign chưa có nhóm, tường cá nhân hoặc fanpage.");
   const campaign = {
     id: crypto.randomUUID(),
     name: `${car.brand || ""} ${car.model || ""}`.trim(),
@@ -85,7 +85,7 @@ export async function createCampaign({ car, account, selectedGroups = [], conten
     groupSnapshots: selectedGroups.map((group) => ({ ...group })),
     imageCount,
     variationPlan,
-    metadata: { includeProfile: includeProfile === true },
+    metadata: { includeProfile: includeProfile === true, includePage: includePage === true },
     jobIds: [],
     totalJobs: 0,
     waitingJobs: 0,

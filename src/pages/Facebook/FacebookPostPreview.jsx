@@ -15,6 +15,9 @@ import { getCarById } from "../../services/carService";
 import {
     addToPostingQueue,
     addProfileJobToQueue,
+    addPageJobToQueue,
+    publishPageJob,
+    checkPageToken,
 } from "../../services/facebookPostingQueueService";
 
 import {
@@ -93,6 +96,26 @@ function FacebookPostPreview() {
     // Job này do Tiện ích Chrome "ToyotaSureHub Auto Wall" tự đăng.
     const [postToProfile, setPostToProfile] =
         useState(false);
+
+    // Đăng lên Fanpage qua API chính thức (Edge Function fb-page-post).
+    // pageScheduleAt trống = đăng ngay; có giờ = Facebook tự đăng đúng giờ.
+    const [postToPage, setPostToPage] =
+        useState(false);
+
+    const [pageScheduleAt, setPageScheduleAt] =
+        useState("");
+
+    const [pageCheck, setPageCheck] =
+        useState(null);
+
+    async function handleCheckPage() {
+        setPageCheck({ loading: true });
+        try {
+            setPageCheck(await checkPageToken());
+        } catch (error) {
+            setPageCheck({ ok: false, reason: error?.message || "Lỗi không xác định." });
+        }
+    }
 
       
     // ==========================================
@@ -974,11 +997,12 @@ function handleClearSelectedGroups() {
         if (
             selectedGroups.length ===
             0 &&
-            !postToProfile
+            !postToProfile &&
+            !postToPage
         ) {
 
             alert(
-                "⚠️ Chưa chọn nhóm Facebook hoặc tường cá nhân."
+                "⚠️ Chưa chọn nhóm, tường cá nhân hoặc fanpage."
             );
 
             return;
@@ -992,8 +1016,27 @@ function handleClearSelectedGroups() {
                 .map((image) => getImageSrc(image))
                 .filter((src) => /^https?:\/\//.test(src || ""));
 
+        let pageScheduleIso = null;
+
+        if (postToPage && pageScheduleAt) {
+            const when = new Date(pageScheduleAt);
+            const minutesAhead = (when.getTime() - Date.now()) / 60000;
+
+            if (Number.isNaN(when.getTime()) || minutesAhead < 10) {
+                alert("⚠️ Giờ hẹn đăng Fanpage phải sau thời điểm hiện tại ít nhất 10 phút.");
+                return;
+            }
+
+            if (minutesAhead > 29 * 24 * 60) {
+                alert("⚠️ Facebook chỉ cho hẹn giờ tối đa khoảng 29 ngày.");
+                return;
+            }
+
+            pageScheduleIso = when.toISOString();
+        }
+
         if (
-            postToProfile &&
+            (postToProfile || postToPage) &&
             profileImageUrls.length === 0
         ) {
 
@@ -1052,6 +1095,8 @@ function handleClearSelectedGroups() {
                 `👥 Số nhóm: ${selectedGroups.length}\n` +
 
                 (postToProfile ? `🧱 Đăng thêm lên tường cá nhân (tiện ích Chrome tự đăng)\n` : "") +
+
+                (postToPage ? `📄 Đăng lên Fanpage ${pageScheduleIso ? "lúc " + new Date(pageScheduleIso).toLocaleString("vi-VN") : "NGAY"}\n` : "") +
 
                `📷 Ảnh: ${images.length}\n` +
 
@@ -1724,12 +1769,15 @@ function createVariationPlan(
             // ======================================
 
 const PROFILE_PLAN_ID = "__profile__";
+const PAGE_PLAN_ID = "__page__";
 
 const variationPlan =
     createVariationPlan(
-        postToProfile
-            ? [...selectedGroups, { id: PROFILE_PLAN_ID }]
-            : selectedGroups,
+        [
+            ...selectedGroups,
+            ...(postToProfile ? [{ id: PROFILE_PLAN_ID }] : []),
+            ...(postToPage ? [{ id: PAGE_PLAN_ID }] : []),
+        ],
         images.length,
         content.trim(),
         postingCar
@@ -1771,6 +1819,9 @@ console.log(
 
                     includeProfile:
                         postToProfile,
+
+                    includePage:
+                        postToPage,
 
                 });
 
@@ -1939,6 +1990,68 @@ const job =
 
 
             // ======================================
+            // 2c. JOB FANPAGE (nếu có tick) — đăng luôn qua API
+            // ======================================
+
+            let pageResultText = "";
+
+            if (postToPage) {
+
+                const pageVariation =
+                    variationPlan.find(
+                        (item) =>
+                            String(item.groupId) ===
+                            PAGE_PLAN_ID
+                    ) || null;
+
+                const pageIndexes =
+                    Array.isArray(pageVariation?.imageIndexes)
+                        ? pageVariation.imageIndexes
+                        : [];
+
+                const pageUrls =
+                    pageIndexes
+                        .map((index) => getImageSrc(images[index]))
+                        .filter((src) => /^https?:\/\//.test(src || ""));
+
+                const pageJob =
+                    await addPageJobToQueue({
+                        campaignId:
+                            campaign.id,
+                        carId:
+                            postingCar.id,
+                        content:
+                            pageVariation?.content ||
+                            content.trim(),
+                        imageUrls:
+                            pageUrls.length > 0
+                                ? pageUrls
+                                : profileImageUrls,
+                        accountId:
+                            String(selectedAccountId || ""),
+                        variation:
+                            pageVariation,
+                        scheduledAt:
+                            pageScheduleIso,
+                    });
+
+                createdJobs.push(
+                    pageJob
+                );
+
+                const published =
+                    await publishPageJob(pageJob.id);
+
+                pageResultText =
+                    published?.ok
+                        ? published.result?.scheduledFor
+                            ? `📄 Fanpage: đã hẹn giờ ${new Date(published.result.scheduledFor).toLocaleString("vi-VN")}\n`
+                            : "📄 Fanpage: ĐÃ ĐĂNG ✅\n"
+                        : `📄 Fanpage LỖI: ${published?.reason || "không rõ"}\n(Ông vào FB Queue bấm "Đăng lên Fanpage" để thử lại)\n`;
+            }
+
+
+            // ======================================
             // 3. GẮN JOB IDS VÀO CAMPAIGN
             // ======================================
 
@@ -1993,6 +2106,8 @@ const job =
                 `👥 ${selectedGroups.length} nhóm\n` +
 
                 (postToProfile ? "🧱 + 1 bài tường cá nhân (tiện ích Chrome sẽ tự đăng)\n" : "") +
+
+                pageResultText +
 
                 `🆔 Campaign: ${campaign.id}\n\n` +
 
@@ -3300,6 +3415,88 @@ const job =
                         </span>
                     </label>
 
+                    <div
+                        style={{
+                            padding: "12px",
+                            marginTop: "8px",
+                            border: "1px solid #d7e3f4",
+                            background: postToPage ? "#eef5ff" : "#fafbfc",
+                            borderRadius: "10px",
+                        }}
+                    >
+                        <label
+                            style={{
+                                display: "flex",
+                                alignItems: "flex-start",
+                                gap: "10px",
+                                cursor: "pointer",
+                            }}
+                        >
+                            <input
+                                type="checkbox"
+                                checked={postToPage}
+                                onChange={(event) =>
+                                    setPostToPage(event.target.checked)
+                                }
+                                style={{ marginTop: "3px", width: "18px", height: "18px" }}
+                            />
+                            <span>
+                                <strong>📄 Đăng lên Fanpage</strong>
+                                <br />
+                                <span style={{ fontSize: "13px", color: "#666" }}>
+                                    Đăng qua kết nối chính thức của Facebook, không cần máy tính bật.
+                                </span>
+                            </span>
+                        </label>
+
+                        {postToPage && (
+                            <div style={{ marginTop: "10px", marginLeft: "28px", fontSize: "14px" }}>
+                                🕒 Hẹn giờ (để trống = đăng ngay):
+                                <div style={{ display: "flex", gap: "8px", marginTop: "6px", flexWrap: "wrap" }}>
+                                    <input
+                                        type="datetime-local"
+                                        value={pageScheduleAt}
+                                        onChange={(event) =>
+                                            setPageScheduleAt(event.target.value)
+                                        }
+                                        style={{ padding: "6px 8px", borderRadius: "6px", border: "1px solid #ccd" }}
+                                    />
+                                    {pageScheduleAt && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setPageScheduleAt("")}
+                                            style={{ padding: "6px 10px", borderRadius: "6px", border: "1px solid #ccd", background: "#fff", cursor: "pointer" }}
+                                        >
+                                            Đăng ngay
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={handleCheckPage}
+                                        disabled={pageCheck?.loading}
+                                        style={{ padding: "6px 10px", borderRadius: "6px", border: "1px solid #ccd", background: "#fff", cursor: "pointer" }}
+                                    >
+                                        {pageCheck?.loading ? "⏳ Đang kiểm tra..." : "🔍 Kiểm tra kết nối Fanpage"}
+                                    </button>
+                                </div>
+                                {pageCheck && !pageCheck.loading && (
+                                    <div
+                                        style={{
+                                            marginTop: "8px",
+                                            fontSize: "13px",
+                                            color: pageCheck.ok ? "#0f8a4b" : "#b5141a",
+                                        }}
+                                    >
+                                        {pageCheck.ok
+                                            ? `✅ Kết nối tốt: fanpage "${pageCheck.page?.name}" — đủ quyền đăng bài.`
+                                            : `❌ ${pageCheck.reason || "Chưa kết nối được."}`}
+                                        {!pageCheck.ok && pageCheck.page?.name ? ` (fanpage: ${pageCheck.page.name})` : ""}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
                     <br />
 
                     <PrimaryButton
@@ -3310,7 +3507,7 @@ const job =
                             addingToQueue ||
                             !selectedAccount ||
                             (selectedGroups.length ===
-                                0 && !postToProfile) ||
+                                0 && !postToProfile && !postToPage) ||
                             images.length ===
                                 0 ||
                             !content.trim()
@@ -3318,9 +3515,11 @@ const job =
                     >
                         {addingToQueue
                             ? "⏳ Đang tạo Queue..."
-                            : selectedGroups.length > 0
-                                ? `➕ TẠO QUEUE CHO ${selectedGroups.length} NHÓM${postToProfile ? " + TƯỜNG" : ""}`
-                                : "➕ TẠO QUEUE ĐĂNG TƯỜNG CÁ NHÂN"}
+                            : `➕ TẠO QUEUE: ${[
+                                  selectedGroups.length > 0 ? `${selectedGroups.length} NHÓM` : "",
+                                  postToProfile ? "TƯỜNG" : "",
+                                  postToPage ? "FANPAGE" : "",
+                              ].filter(Boolean).join(" + ") || "CHƯA CHỌN ĐÍCH ĐĂNG"}`}
                     </PrimaryButton>
 
 

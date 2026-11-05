@@ -121,6 +121,16 @@ export async function postToWall(job, images, opts) {
     return new File([bytes], item.name || `anh-${index + 1}.${ext}`, { type, lastModified: Date.now() });
   }
 
+  // Cửa sổ mở ngầm bị Windows che → Chrome cho trang "ngủ", Facebook
+  // xử lý ảnh bị treo. Khi đó nhờ tiện ích đưa cửa sổ lên trước.
+  async function ensureVisible(reason) {
+    if (!document.hidden) return;
+    step(`Trang đang bị ẩn → đưa cửa sổ lên trước (${reason})`);
+    try { chrome.runtime.sendMessage({ type: "tsh-need-focus" }); } catch { /* bỏ qua */ }
+    await waitFor(() => !document.hidden, 8000, 300);
+    await sleep(800);
+  }
+
   function pasteInto(target, dataTransfer) {
     target.focus();
     const event = new ClipboardEvent("paste", { clipboardData: dataTransfer, bubbles: true, cancelable: true });
@@ -178,6 +188,7 @@ export async function postToWall(job, images, opts) {
 
     // ---------- 4. Gắn ảnh ----------
     if (Array.isArray(images) && images.length > 0) {
+      await ensureVisible("gắn ảnh");
       const files = images.map(base64ToFile);
       const before = mediaCount(dialog);
 
@@ -210,6 +221,7 @@ export async function postToWall(job, images, opts) {
       if (!attached) return done(false, "ui", "Ảnh không gắn được vào bài.");
 
       // Chờ ảnh tải lên xong (thanh tiến trình biến mất)
+      await ensureVisible("tải ảnh");
       await sleep(Math.min(2000 * files.length, 25000));
       await waitFor(() => !dialog.querySelector('[role="progressbar"]'), 90000, 1000);
       step(`Đã gắn ảnh (${mediaCount(dialog)} ảnh hiển thị)`);
@@ -218,23 +230,33 @@ export async function postToWall(job, images, opts) {
     await human(1500, 3000);
 
     // ---------- 5. Bấm Đăng ----------
-    let postBtn = await waitFor(() => {
-      const btn = findButtonIn(dialog, TEXT.post);
-      return btn && !isDisabled(btn) ? btn : null;
-    }, 60000);
+    // Facebook có 2 kiểu: nút "Đăng" luôn, hoặc "Tiếp" rồi mới tới "Đăng".
+    // Tìm cái nào bấm được trước thì dùng cái đó.
+    const findEnabled = (pattern) => {
+      for (const scope of document.querySelectorAll('[role="dialog"]')) {
+        const btn = findButtonIn(scope, pattern);
+        if (btn && !isDisabled(btn)) return btn;
+      }
+      return null;
+    };
 
-    if (!postBtn) {
-      // Giao diện mới: "Tiếp" rồi mới tới "Đăng"
-      const nextBtn = findButtonIn(dialog, TEXT.next);
-      if (nextBtn && !isDisabled(nextBtn)) {
-        nextBtn.click();
+    let postBtn = null;
+    for (let round = 0; round < 3 && !postBtn; round += 1) {
+      await ensureVisible("tìm nút Đăng");
+      const found = await waitFor(() => {
+        const post = findEnabled(TEXT.post);
+        if (post) return { kind: "post", el: post };
+        const next = findEnabled(TEXT.next);
+        if (next) return { kind: "next", el: next };
+        return null;
+      }, 60000);
+      if (!found) break;
+      if (found.kind === "post") {
+        postBtn = found.el;
+      } else {
+        found.el.click();
         step("Bấm \"Tiếp\"");
-        await human(1500, 2500);
-        postBtn = await waitFor(() => {
-          const scope = document.querySelector('[role="dialog"]') || document;
-          const btn = findButtonIn(scope, TEXT.post);
-          return btn && !isDisabled(btn) ? btn : null;
-        }, 30000);
+        await human(2000, 3500);
       }
     }
     if (!postBtn) return done(false, "ui", "Nút \"Đăng\" không bấm được (có thể ảnh chưa tải xong).");
