@@ -349,10 +349,35 @@ async function getProfileUrl(settings) {
   return "https://www.facebook.com/me";
 }
 
+// Nhận mọi kiểu link nhóm: có/không https, có/không www, m., web., fb.com,
+// hoặc chỉ ghi "groups/123..." / mã số nhóm → đổi về https://www.facebook.com/...
+function normalizeGroupUrl(value) {
+  let raw = String(value || "").trim();
+  if (!raw) return "";
+  if (/^\d{5,}$/.test(raw)) raw = `groups/${raw}`;
+  raw = raw
+    .replace(/^https?:\/\//i, "")
+    .replace(/^(www\.|web\.|m\.|mbasic\.)?(facebook\.com|fb\.com)\/?/i, "")
+    .replace(/^\/+/, "");
+  if (!/^groups\/[^/?#\s]+/i.test(raw)) return "";
+  return `https://www.facebook.com/${raw}`;
+}
+
 function groupUrlOf(job) {
-  const url = String(job.payload?.group?.url || "").trim();
-  if (!/^https?:\/\/(www|web|m)\.facebook\.com\//.test(url)) return "";
-  return url.replace("://m.", "://www.").replace("://web.", "://www.");
+  const g = job.payload?.group || {};
+  return normalizeGroupUrl(g.url) || normalizeGroupUrl(g.link) || normalizeGroupUrl(g.facebookGroupId);
+}
+
+// Job thiếu link → đọc lại từ danh sách nhóm (link / mã nhóm mới nhất)
+async function resolveGroupUrl(job) {
+  const fromJob = groupUrlOf(job);
+  if (fromJob || !job.group_id) return fromJob;
+  try {
+    const rows = await rest("GET", `facebook_groups?select=group_url,group_id&id=eq.${job.group_id}&limit=1`);
+    return normalizeGroupUrl(rows?.[0]?.group_url) || normalizeGroupUrl(rows?.[0]?.group_id);
+  } catch {
+    return "";
+  }
 }
 
 async function openFacebook(url) {
@@ -391,8 +416,11 @@ async function runInTab(tabId, job, images, opts) {
 async function prepare(job, kind, settings, { dryRun = false } = {}) {
   if (kind === "profile") return { url: await getProfileUrl(settings), opts: { dryRun } };
 
-  const url = groupUrlOf(job);
-  if (!url) throw Object.assign(new Error("Job nhóm chưa có link nhóm Facebook."), { code: "no_url" });
+  const url = await resolveGroupUrl(job);
+  if (!url) {
+    const saved = String(job.payload?.group?.url || "").slice(0, 80) || "(trống)";
+    throw Object.assign(new Error(`Nhóm "${job.payload?.group?.name || "?"}" chưa có link nhóm hợp lệ (đang lưu: ${saved}).`), { code: "no_url" });
+  }
 
   const car = await getCar(job.car_id);
   const fallback = String(settings.groupFallbackKeywords || "")
@@ -556,9 +584,23 @@ async function dryRun(kind) {
 
   const rows = await rest(
     "GET",
-    `facebook_queue?select=*&target_type=eq.${kind}&status=eq.pending&account_id=eq.${encodeURIComponent(settings.accountId)}&order=created_at.asc&limit=1`
+    `facebook_queue?select=*&target_type=eq.${kind}&status=eq.pending&account_id=eq.${encodeURIComponent(settings.accountId)}&order=created_at.asc&limit=30`
   );
-  let job = rows?.[0] || null;
+  let job = null;
+  if (kind === "group") {
+    for (const row of rows || []) {
+      if (await resolveGroupUrl(row)) {
+        job = row;
+        break;
+      }
+    }
+  } else {
+    job = rows?.[0] || null;
+  }
+  if (!job && kind === "group" && rows?.length) {
+    const sample = String(rows[0].payload?.group?.url || "(trống)").slice(0, 80);
+    return { ok: false, reason: `Các job nhóm đang chờ chưa có link nhóm hợp lệ. Ví dụ link đang lưu: ${sample}` };
+  }
   if (!job) {
     if (kind === "group") return { ok: false, reason: "Không có job nhóm nào đang chờ của tài khoản này để chạy thử." };
     job = { payload: { content: "🧪 Bài chạy thử từ ToyotaSureHub Auto Wall — tiện ích sẽ KHÔNG bấm Đăng.", imageUrls: [] } };
