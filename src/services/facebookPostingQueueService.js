@@ -343,9 +343,26 @@ export async function deleteQueueJobsByCarId(carId) {
   return jobs.length;
 }
 
+// ==========================================
+// XÓA TOÀN BỘ QUEUE NHÓM
+// ==========================================
+// Chỉ xóa job đăng NHÓM. Job Tường cá nhân & Fanpage
+// được giữ lại, có nút xóa riêng (clearTargetJobs).
+// ==========================================
+
 export function clearPostingQueue() {
-  setStoreData("queue", []);
-  void supabase.from("facebook_queue").delete().neq("id", "00000000-0000-0000-0000-000000000000").then(({ error }) => { if (error) console.error("Queue clear error:", error); });
+  setStoreData("queue", loadPostingQueue().filter((job) => normalizeTarget(job.targetType) !== "group"));
+  void supabase.from("facebook_queue").delete().eq("target_type", "group").then(({ error }) => { if (error) console.error("Queue clear error:", error); });
+}
+
+// Xóa toàn bộ job Tường cá nhân + Fanpage
+export async function clearTargetJobs() {
+  const jobs = loadPostingQueue().filter((job) => normalizeTarget(job.targetType) !== "group");
+  if (!jobs.length) return 0;
+  const { error } = await supabase.from("facebook_queue").delete().in("target_type", ["profile", "page"]);
+  if (error) throw error;
+  setStoreData("queue", loadPostingQueue().filter((job) => normalizeTarget(job.targetType) === "group"));
+  return jobs.length;
 }
 
 // ==========================================

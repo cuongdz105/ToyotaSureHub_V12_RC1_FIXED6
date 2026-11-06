@@ -12,6 +12,7 @@ import {
     removeQueueJob,
     clearPostingQueue,
     clearSuccessJobs,
+    clearTargetJobs,
     getQueueStats,
     prepareManualPostingJob,
     confirmManualPosted,
@@ -76,7 +77,19 @@ function FacebookPostingQueue() {
     // Trang này tự re-render ngay khi Queue thay đổi ở bất kỳ đâu
     // trong app (không cần refresh thủ công / không bị dữ liệu cũ).
     const snapshot = useSyncExternalStore(subscribe, getStoreSnapshot, getStoreSnapshot);
-    const queue = snapshot.queue;
+    // Job Tường cá nhân & Fanpage luôn nằm trên cùng,
+    // các job nhóm giữ nguyên thứ tự bên dưới.
+    const queue = [...snapshot.queue].sort(
+        (a, b) =>
+            Number(a.targetType === "profile" || a.targetType === "page" ? 0 : 1) -
+            Number(b.targetType === "profile" || b.targetType === "page" ? 0 : 1)
+    );
+
+    const targetJobCount = queue.filter(
+        (job) => job.targetType === "profile" || job.targetType === "page"
+    ).length;
+
+    const groupJobCount = queue.length - targetJobCount;
     const cars = snapshot.cars;
     const stats = getQueueStats();
 
@@ -709,9 +722,15 @@ function handleDownloadImage(image, job, index) {
 
     function handleClear() {
 
+        if (groupJobCount === 0) {
+            alert("📭 Không có Job đăng nhóm nào để xóa.");
+            return;
+        }
+
         if (
             !window.confirm(
-                "Xóa toàn bộ hàng đợi đăng Facebook?"
+                `Xóa toàn bộ ${groupJobCount} Job đăng NHÓM?\n\n` +
+                "Job Tường cá nhân & Fanpage được giữ lại (có nút xóa riêng)."
             )
         ) {
             return;
@@ -720,6 +739,34 @@ function handleDownloadImage(image, job, index) {
         clearPostingQueue();
 
         refresh();
+    }
+
+
+    function handleClearTargetJobs() {
+
+        if (targetJobCount === 0) {
+            alert("📭 Không có Job Tường cá nhân / Fanpage nào để xóa.");
+            return;
+        }
+
+        if (
+            !window.confirm(
+                `Xóa ${targetJobCount} Job Tường cá nhân & Fanpage?\n\n` +
+                "Bài đã đăng lên Facebook KHÔNG bị gỡ. Dữ liệu Báo cáo KHÔNG bị ảnh hưởng."
+            )
+        ) {
+            return;
+        }
+
+        clearTargetJobs()
+            .then(() => refresh())
+            .catch((error) => {
+                console.error("Clear target jobs error:", error);
+                alert(
+                    "❌ Không thể xóa:\n\n" +
+                        (error?.message || "Lỗi không xác định.")
+                );
+            });
     }
 
     
@@ -2807,7 +2854,24 @@ function handleDownloadImage(image, job, index) {
                                     "#777",
                             }}
                         >
-                            🗑️ Xóa toàn bộ Queue
+                            🗑️ Xóa toàn bộ Queue nhóm
+                        </PrimaryButton>
+
+
+                        <PrimaryButton
+                            onClick={
+                                handleClearTargetJobs
+                            }
+                            disabled={
+                                processing ||
+                                targetJobCount === 0
+                            }
+                            style={{
+                                background:
+                                    "#5c6bc0",
+                            }}
+                        >
+                            🗑️ Xóa Job Tường & Fanpage ({targetJobCount})
                         </PrimaryButton>
 
                     </div>
