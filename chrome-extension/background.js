@@ -148,10 +148,12 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === "tsh-heartbeat") return false;
 
-  // Script đăng bài báo trang bị ẩn → đưa cửa sổ Facebook lên trước
+  // Script đăng bài báo trang bị ẩn → chỉ bỏ thu nhỏ cửa sổ, KHÔNG giành focus
+  // (để ông đang chơi game / gõ phím không bị nhảy sang Facebook, phím gõ không lọt vào bài đăng).
+  // Mở Chrome bằng Mo-Chrome-Dang-Bai.bat thì cửa sổ bị che vẫn không bị coi là ẩn.
   if (message?.type === "tsh-need-focus" && sender?.tab?.windowId) {
-    chrome.windows.update(sender.tab.windowId, { focused: true, state: "normal" }).catch(() => {});
-    log("Cửa sổ Facebook bị ẩn → tạm đưa lên trước để đăng cho xong.");
+    chrome.windows.update(sender.tab.windowId, { state: "normal" }).catch(() => {});
+    log("Trang Facebook bị ẩn → bỏ thu nhỏ cửa sổ (không giành focus). Nên mở Chrome bằng Mo-Chrome-Dang-Bai.bat.", "warn");
     return false;
   }
 
@@ -412,6 +414,38 @@ async function runInTab(tabId, job, images, opts) {
   return first?.result || { ok: false, code: "script", reason: "Script không trả kết quả.", steps: [] };
 }
 
+// Từ khoá rút gọn theo dòng xe (theo kiến nghị của ông).
+// Thứ tự quan trọng: "Yaris Cross", "Innova Cross" phải kiểm trước "cross".
+const MODEL_KEYWORDS = [
+  ["yaris", "yaris"],
+  ["innova", "innova"],
+  ["cross", "cross"],          // Corolla Cross
+  ["altis", "altis"],
+  ["corolla", "altis"],
+  ["prado", "land"],           // Prado + Land Cruiser dùng chung "land"
+  ["land", "land"],
+  ["camry", "camry"],
+  ["vios", "vios"],
+  ["innova", "innova"],
+  ["veloz", "veloz"],
+  ["wigo", "wigo"],
+  ["fortuner", "fortuner"],
+  ["raize", "raize"],
+  ["hilux", "hilux"],
+  ["avanza", "avanza"],
+  ["rush", "rush"],
+  ["alphard", "alphard"],
+  ["hiace", "hiace"],
+  ["lexus", "lexus"],
+];
+
+function modelKeyword(model) {
+  const m = norm(model);
+  if (!m) return "";
+  for (const [needle, kw] of MODEL_KEYWORDS) if (m.includes(needle)) return kw;
+  return m.split(" ")[0]; // dòng xe lạ: lấy chữ đầu
+}
+
 // Chuẩn bị: link mở + tùy chọn chia sẻ thêm nhóm
 async function prepare(job, kind, settings, { dryRun = false } = {}) {
   if (kind === "profile") return { url: await getProfileUrl(settings), opts: { dryRun } };
@@ -427,7 +461,7 @@ async function prepare(job, kind, settings, { dryRun = false } = {}) {
     .split(",")
     .map((t) => t.trim())
     .filter(Boolean);
-  const keywords = [car?.model, ...fallback].filter(Boolean);
+  const keywords = [...new Set([modelKeyword(car?.model), ...fallback].filter(Boolean))];
   const max = Math.max(0, Math.min(10, Number(settings.groupExtraCount) || 0));
 
   return {
@@ -614,10 +648,12 @@ async function dryRun(kind) {
   const result = await runInTab(opened.tabId, job, images, prep.opts);
   const shared = result.sharedGroups || [];
   const extra = kind === "group" ? ` Đã tick ${shared.length} nhóm thêm (từ khoá: ${(prep.opts.share?.keywords || []).join(", ") || "không có"}).` : "";
+  const stepTail = (result.steps || []).slice(-8).map((s) => "• " + s).join("  ");
   await log(
-    result.ok
+    (result.ok
       ? `🧪 Chạy thử ${KIND_LABEL[kind]} OK — đã điền bài, chưa bấm Đăng.${extra}`
-      : `🧪 Chạy thử ${KIND_LABEL[kind]} lỗi: ${result.reason}`,
+      : `🧪 Chạy thử ${KIND_LABEL[kind]} lỗi: ${result.reason}`) +
+      (kind === "group" && stepTail ? ` — Các bước: ${stepTail}` : ""),
     result.ok ? "info" : "error"
   );
   return {

@@ -22,8 +22,8 @@
 export async function postToFacebook(job, images, opts) {
   const TEXT = {
     composer: /^(bạn đang nghĩ gì|what'?s on your mind|viết nội dung|write something|bạn viết gì đi|tạo bài viết công khai|create a public post)/i,
-    shareGroups: /^(chia sẻ lên nhóm|share to groups?)/i,
-    groupsDone: /^(xong|done|lưu|save)$/i,
+    shareGroups: /^(chia sẻ (lên|vào|với) (nhiều |các |thêm )?nhóm|đăng (lên|vào|trong) (nhiều |các |thêm )?nhóm|thêm nhóm|chọn nhóm|nhóm khác|share (to|in) (more |other )?groups?|post (to|in) (more |other )?groups?|add groups?|more groups)/i,
+    groupsDone: /^(xong|done|lưu|save|áp dụng|apply|chọn|select|ok)$/i,
     shareLimit: /(đạt đến giới hạn|reached the limit|giới hạn chia sẻ|sharing limit)/i,
     joinGroup: /^(tham gia nhóm|join group)$/i,
     photo: /^(ảnh\/video|photo\/video|ảnh|photo)$/i,
@@ -177,7 +177,16 @@ export async function postToFacebook(job, images, opts) {
       return null;
     }, 15000);
     if (!opener) {
-      step("⚠️ Không thấy mục \"Chia sẻ lên nhóm\" — chỉ đăng nhóm chính");
+      // Ghi lại các nút đang thấy trong khung soạn bài để biết Facebook đặt tên gì
+      const seen = [];
+      for (const scope of document.querySelectorAll('[role="dialog"]')) {
+        for (const el of scope.querySelectorAll('[role="button"], [role="switch"], [role="checkbox"], [role="link"], button')) {
+          if (!isVisible(el)) continue;
+          const t = labelOf(el).slice(0, 40);
+          if (t && !seen.includes(t)) seen.push(t);
+        }
+      }
+      step("⚠️ Không thấy mục \"Chia sẻ lên nhóm\" — chỉ đăng nhóm chính. Các nút đang thấy: " + seen.slice(0, 40).join(" | "));
       return [];
     }
     opener.click();
@@ -202,27 +211,32 @@ export async function postToFacebook(job, images, opts) {
       return [];
     }
 
-    // Cuộn hết danh sách (không gõ tìm kiếm)
-    const scroller = (() => {
-      let el = checkboxesIn(picker)[0];
-      while (el && el !== picker) {
-        const style = getComputedStyle(el);
-        if (el.scrollHeight > el.clientHeight + 20 && /(auto|scroll)/.test(style.overflowY)) return el;
-        el = el.parentElement;
-      }
-      return null;
-    })();
-    if (scroller) {
-      let last = -1;
+    // Cuộn hết danh sách (không gõ tìm kiếm): Facebook chỉ tải thêm nhóm khi
+    // cuộn xuống, nên kéo ô tick CUỐI CÙNG vào tầm nhìn, lặp tới khi hết nhóm mới.
+    {
+      let last = checkboxesIn(picker).length;
       let still = 0;
-      for (let i = 0; i < 60 && still < 3; i += 1) {
-        scroller.scrollTop = scroller.scrollHeight;
-        await sleep(rand(900, 1500));
+      for (let i = 0; i < 80 && still < 4; i += 1) {
+        const boxes = checkboxesIn(picker);
+        const lastBox = boxes[boxes.length - 1];
+        if (lastBox) {
+          lastBox.scrollIntoView({ block: "end" });
+          // Cuộn thêm khung chứa (nếu tìm được) cho chắc
+          let el = lastBox.parentElement;
+          while (el && el !== document.body) {
+            if (el.scrollHeight > el.clientHeight + 20 && /(auto|scroll)/.test(getComputedStyle(el).overflowY)) {
+              el.scrollTop = el.scrollHeight;
+              break;
+            }
+            el = el.parentElement;
+          }
+        }
+        await sleep(rand(1000, 1600));
         const count = checkboxesIn(picker).length;
         still = count === last ? still + 1 : 0;
         last = count;
       }
-      scroller.scrollTop = 0;
+      checkboxesIn(picker)[0]?.scrollIntoView({ block: "center" });
       await sleep(600);
     }
 
@@ -269,7 +283,8 @@ export async function postToFacebook(job, images, opts) {
         row.box.scrollIntoView({ block: "center" });
         await human(300, 700);
         row.box.click();
-        await sleep(500);
+        // Facebook đôi khi cập nhật dấu tick chậm → chờ tới 3 giây rồi mới kết luận
+        await waitFor(() => isChecked(row.box), 3000, 250);
         if (!isChecked(row.box)) {
           const limit = [...document.querySelectorAll('[role="dialog"]')].some((d) => TEXT.shareLimit.test(d.innerText || ""));
           if (limit) {
