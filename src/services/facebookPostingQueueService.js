@@ -242,7 +242,8 @@ export async function checkPageToken() {
 // Tiện ích Chrome cập nhật trạng thái job tường trực tiếp trên
 // Supabase → trang Queue gọi hàm này định kỳ để thấy kết quả mới.
 export async function syncProfileJobsFromServer() {
-  const local = loadPostingQueue().filter((job) => isProfileJob(job) && ["pending", "processing"].includes(job.status));
+  // Job tường + job nhóm: tiện ích Chrome có thể đổi trạng thái thẳng trên Supabase
+  const local = loadPostingQueue().filter((job) => !isPageJob(job) && ["pending", "processing"].includes(job.status)).slice(0, 150);
   if (!local.length) return 0;
   const { data, error } = await supabase.from("facebook_queue").select("*").in("id", local.map((job) => job.id));
   if (error) {

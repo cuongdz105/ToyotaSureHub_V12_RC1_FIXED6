@@ -2,7 +2,12 @@ import { DEFAULT_SETTINGS } from "./defaults.js";
 import { signIn, signOut, getSession, rest } from "./supabase.js";
 
 const $ = (id) => document.getElementById(id);
-const NUM_FIELDS = ["dailyLimit", "gapMinMinutes", "gapMaxMinutes", "activeFrom", "activeTo"];
+const NUM_FIELDS = [
+  "activeFrom", "activeTo",
+  "dailyLimit", "gapMinMinutes", "gapMaxMinutes",
+  "groupDailyLimit", "groupExtraCount", "groupGapMinMinutes", "groupGapMaxMinutes",
+];
+const BOOL_FIELDS = ["closeWindowOnSuccess", "wallEnabled", "groupEnabled"];
 
 async function getSettings() {
   const { settings = {} } = await chrome.storage.local.get("settings");
@@ -23,8 +28,13 @@ function setMsg(text, kind = "") {
 
 function fmtTime(ms) {
   if (!ms || ms <= Date.now()) return "ngay";
-  const d = new Date(ms);
-  return d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+  return new Date(ms).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+}
+
+function updateGroupTotal() {
+  const per = 1 + (Number($("groupExtraCount").value) || 0);
+  const times = Number($("groupDailyLimit").value) || 0;
+  $("groupTotal").textContent = `≈ ${per * times} nhóm/ngày cho tài khoản này (${times} lần × ${per} nhóm).`;
 }
 
 // ---------------- Nạp form ----------------
@@ -35,7 +45,9 @@ async function fillForm() {
   $("supabaseKey").value = s.supabaseKey;
   $("enabled").checked = s.enabled;
   NUM_FIELDS.forEach((key) => ($(key).value = s[key]));
-  $("closeWindowOnSuccess").checked = s.closeWindowOnSuccess;
+  BOOL_FIELDS.forEach((key) => ($(key).checked = Boolean(s[key])));
+  $("groupFallbackKeywords").value = s.groupFallbackKeywords || "";
+  updateGroupTotal();
 
   const session = await getSession();
   $("whoami").textContent = session ? `— ${session.email}` : "— chưa đăng nhập";
@@ -73,9 +85,25 @@ async function refreshStatus() {
   const s = await getSettings();
   const res = await chrome.runtime.sendMessage({ type: "tsh-status" }).catch(() => null);
   if (res?.ok) {
-    $("sToday").textContent = `${res.postedToday}/${s.dailyLimit}`;
-    $("sPending").textContent = res.pending === null ? "–" : res.pending;
-    $("sNext").textContent = res.busy ? "đang đăng…" : s.enabled ? fmtTime(res.nextAllowedAt) : "đang tắt";
+    for (const [kind, rowId] of [["profile", "rowProfile"], ["group", "rowGroup"]]) {
+      const k = res.kinds?.[kind] || {};
+      const row = $(rowId);
+      row.classList.toggle("off", !k.on);
+      row.querySelector(".today").textContent = `${k.postedToday ?? 0}/${k.limit ?? "–"}`;
+      row.querySelector(".pending").textContent = k.pending === null || k.pending === undefined ? "–" : k.pending;
+      row.querySelector(".next").textContent = res.busy
+        ? "đang đăng…"
+        : !s.enabled
+          ? "đang tắt"
+          : !k.on
+            ? "không bật"
+            : k.postedToday >= k.limit
+              ? "mai"
+              : fmtTime(k.nextAllowedAt);
+    }
+    $("sharedInfo").textContent = res.sharedTodayCount
+      ? `Hôm nay đã chia sẻ thêm ${res.sharedTodayCount} nhóm.`
+      : "";
     const paused = $("paused");
     paused.hidden = !res.pausedReason || s.enabled;
     paused.textContent = `⛔ Đã tự tạm dừng: ${res.pausedReason}. Ông kiểm tra Facebook rồi bật lại công tắc.`;
@@ -120,14 +148,22 @@ $("logout").addEventListener("click", async () => {
   setMsg("Đã đăng xuất, tự động đăng đã tắt.");
 });
 
+["groupExtraCount", "groupDailyLimit"].forEach((id) => $(id).addEventListener("input", updateGroupTotal));
+
 $("save").addEventListener("click", async () => {
   const patch = {
     supabaseUrl: $("supabaseUrl").value.trim(),
     supabaseKey: $("supabaseKey").value.trim(),
-    closeWindowOnSuccess: $("closeWindowOnSuccess").checked,
+    groupFallbackKeywords: $("groupFallbackKeywords").value.trim(),
   };
-  NUM_FIELDS.forEach((key) => (patch[key] = Number($(key).value) || DEFAULT_SETTINGS[key]));
+  NUM_FIELDS.forEach((key) => {
+    const value = Number($(key).value);
+    patch[key] = Number.isFinite(value) && $(key).value !== "" ? value : DEFAULT_SETTINGS[key];
+  });
+  BOOL_FIELDS.forEach((key) => (patch[key] = $(key).checked));
+  patch.groupExtraCount = Math.max(0, Math.min(10, patch.groupExtraCount));
   if (patch.gapMaxMinutes < patch.gapMinMinutes) patch.gapMaxMinutes = patch.gapMinMinutes;
+  if (patch.groupGapMaxMinutes < patch.groupGapMinMinutes) patch.groupGapMaxMinutes = patch.groupGapMinMinutes;
   if (patch.activeTo <= patch.activeFrom) {
     setMsg("Giờ kết thúc phải sau giờ bắt đầu.", "err");
     return;
@@ -156,25 +192,27 @@ $("enabled").addEventListener("change", async (event) => {
   refreshStatus();
 });
 
-async function runAction(type, button, busyText) {
-  button.disabled = true;
+async function runAction(message, button, busyText) {
+  const buttons = ["runNow", "dryWall", "dryGroup"].map($);
+  buttons.forEach((b) => (b.disabled = true));
   const old = button.textContent;
   button.textContent = busyText;
   setMsg("Đang chạy, ông đừng đóng cửa sổ Facebook vừa mở…");
   try {
-    const res = await chrome.runtime.sendMessage({ type });
+    const res = await chrome.runtime.sendMessage(message);
     setMsg(res?.reason || "Xong.", res?.ok ? "ok" : "err");
   } catch (error) {
     setMsg(error.message, "err");
   } finally {
-    button.disabled = false;
+    buttons.forEach((b) => (b.disabled = false));
     button.textContent = old;
     refreshStatus();
   }
 }
 
-$("runNow").addEventListener("click", () => runAction("tsh-run-now", $("runNow"), "⏳ Đang đăng…"));
-$("dryRun").addEventListener("click", () => runAction("tsh-dry-run", $("dryRun"), "⏳ Đang thử…"));
+$("runNow").addEventListener("click", () => runAction({ type: "tsh-run-now" }, $("runNow"), "⏳ Đang đăng…"));
+$("dryWall").addEventListener("click", () => runAction({ type: "tsh-dry-run", kind: "profile" }, $("dryWall"), "⏳ Đang thử…"));
+$("dryGroup").addEventListener("click", () => runAction({ type: "tsh-dry-run", kind: "group" }, $("dryGroup"), "⏳ Đang thử…"));
 
 chrome.storage.onChanged.addListener((changes) => {
   if (changes.logs || changes.state) refreshStatus();

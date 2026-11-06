@@ -5,21 +5,27 @@
 // trang cá nhân Facebook, nên PHẢI tự chứa mọi thứ (không dùng
 // biến/hàm bên ngoài).
 //
-// Các bước:
+// Dùng chung cho TƯỜNG CÁ NHÂN và NHÓM. Các bước:
 //   1. Kiểm tra đã đăng nhập / không bị checkpoint
-//   2. Bấm ô "Bạn đang nghĩ gì?"
+//   2. Bấm ô "Bạn đang nghĩ gì?" (tường) / "Viết nội dung..." (nhóm)
 //   3. Dán nội dung vào khung soạn bài
 //   4. Gắn ảnh (dán ảnh, nếu không được thì dùng nút Ảnh/video)
-//   5. Chờ ảnh tải xong, bấm "Đăng"
-//   6. Chờ khung soạn bài đóng = đăng thành công
+//   5. Bấm "Tiếp" → (nếu có opts.share) "Chia sẻ lên nhóm":
+//      KHÔNG gõ tìm kiếm (máy tính chỉ trả 10 kết quả), mà cuộn hết
+//      danh sách rồi tick các nhóm có từ khoá trong tên, từ trên xuống
+//   6. Bấm "Đăng", chờ khung soạn bài đóng = đăng thành công
 //
 // Facebook đổi giao diện thì thường chỉ cần sửa các mẫu chữ
 // trong TEXT bên dưới.
 // ==========================================================
 
-export async function postToWall(job, images, opts) {
+export async function postToFacebook(job, images, opts) {
   const TEXT = {
-    composer: /^(bạn đang nghĩ gì|what'?s on your mind|bạn đang nghĩ gì vậy)/i,
+    composer: /^(bạn đang nghĩ gì|what'?s on your mind|viết nội dung|write something|bạn viết gì đi|tạo bài viết công khai|create a public post)/i,
+    shareGroups: /^(chia sẻ lên nhóm|share to groups?)/i,
+    groupsDone: /^(xong|done|lưu|save)$/i,
+    shareLimit: /(đạt đến giới hạn|reached the limit|giới hạn chia sẻ|sharing limit)/i,
+    joinGroup: /^(tham gia nhóm|join group)$/i,
     photo: /^(ảnh\/video|photo\/video|ảnh|photo)$/i,
     post: /^(đăng|post)$/i,
     next: /^(tiếp|next)$/i,
@@ -38,11 +44,24 @@ export async function postToWall(job, images, opts) {
     try { chrome.runtime.sendMessage({ type: "tsh-heartbeat" }); } catch { /* bỏ qua */ }
   }, 10000);
 
+  let sharedGroups = [];
+
   const done = (ok, code, reason) => {
     clearInterval(heartbeat);
     step(ok ? "✅ Hoàn tất" : `❌ ${reason}`);
-    return { ok, code, reason: reason || "", steps, url: location.href };
+    return { ok, code, reason: reason || "", steps, url: location.href, sharedGroups };
   };
+
+  // Bỏ dấu tiếng Việt, chữ thường, gom khoảng trắng → để so tên nhóm
+  const norm = (text) =>
+    String(text || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "d")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
 
   const isVisible = (el) => {
     if (!el || !el.isConnected) return false;
@@ -137,6 +156,147 @@ export async function postToWall(job, images, opts) {
     target.dispatchEvent(event);
   }
 
+  // ======================================================
+  // CHIA SẺ LÊN NHÓM
+  // ======================================================
+  // share = { keywords: ["camry","toyota"], max: 10,
+  //           skip: { "<tên đã chuẩn hóa>": số lần đã chia sẻ hôm nay },
+  //           exclude: ["<tên nhóm chính>"] }
+  // Nhóm trùng tên vẫn là nhóm khác nhau → bỏ qua N lần xuất hiện
+  // đầu tiên của 1 tên nếu hôm nay đã chia sẻ tên đó N lần.
+  async function shareToGroups(share) {
+    const opener = await waitFor(() => {
+      for (const scope of document.querySelectorAll('[role="dialog"]')) {
+        const btn = findButtonIn(scope, TEXT.shareGroups);
+        if (btn) return btn;
+        const any = [...scope.querySelectorAll("div, span")].find(
+          (el) => isVisible(el) && TEXT.shareGroups.test((el.innerText || "").trim()) && el.children.length < 6
+        );
+        if (any) return any.closest('[role="button"]') || any;
+      }
+      return null;
+    }, 15000);
+    if (!opener) {
+      step("⚠️ Không thấy mục \"Chia sẻ lên nhóm\" — chỉ đăng nhóm chính");
+      return [];
+    }
+    opener.click();
+    step("Mở \"Chia sẻ lên nhóm\"");
+    await human(1500, 2500);
+
+    const checkboxesIn = (root) =>
+      [...root.querySelectorAll('[role="checkbox"], input[type="checkbox"]')].filter((el) => el.isConnected);
+
+    // Khung "Thêm nhóm" = dialog có nhiều ô tick nhất
+    const findPicker = () => {
+      let best = null;
+      for (const scope of document.querySelectorAll('[role="dialog"]')) {
+        const count = checkboxesIn(scope).length;
+        if (count > 0 && (!best || count > best.count)) best = { scope, count };
+      }
+      return best?.scope || null;
+    };
+    const picker = await waitFor(findPicker, 15000);
+    if (!picker) {
+      step("⚠️ Danh sách nhóm không hiện ra — chỉ đăng nhóm chính");
+      return [];
+    }
+
+    // Cuộn hết danh sách (không gõ tìm kiếm)
+    const scroller = (() => {
+      let el = checkboxesIn(picker)[0];
+      while (el && el !== picker) {
+        const style = getComputedStyle(el);
+        if (el.scrollHeight > el.clientHeight + 20 && /(auto|scroll)/.test(style.overflowY)) return el;
+        el = el.parentElement;
+      }
+      return null;
+    })();
+    if (scroller) {
+      let last = -1;
+      let still = 0;
+      for (let i = 0; i < 60 && still < 3; i += 1) {
+        scroller.scrollTop = scroller.scrollHeight;
+        await sleep(rand(900, 1500));
+        const count = checkboxesIn(picker).length;
+        still = count === last ? still + 1 : 0;
+        last = count;
+      }
+      scroller.scrollTop = 0;
+      await sleep(600);
+    }
+
+    const isChecked = (box) =>
+      box.getAttribute("aria-checked") === "true" || box.checked === true;
+
+    const rowName = (box) => {
+      let el = box;
+      for (let i = 0; i < 8 && el && el !== picker; i += 1) {
+        el = el.parentElement;
+        const text = (el?.innerText || "").trim();
+        if (text.length > 3) {
+          const lines = text.split("\n").map((t) => t.trim()).filter(Boolean);
+          const name = lines.filter((t) => !/^(lần truy cập|last visited|·)/i.test(t) && !/lần truy cập|last visited/i.test(t))[0];
+          if (name) return name;
+        }
+      }
+      return "";
+    };
+
+    const rows = checkboxesIn(picker).map((box) => ({ box, name: rowName(box) })).filter((r) => r.name);
+    step(`Danh sách có ${rows.length} nhóm`);
+
+    const exclude = new Set((share.exclude || []).map(norm));
+    const skip = { ...(share.skip || {}) };
+    const keywords = (share.keywords || []).map(norm).filter(Boolean);
+    const picked = [];
+    const used = new Set();
+
+    for (const kw of keywords) {
+      const seen = {};
+      for (const row of rows) {
+        if (picked.length >= share.max) break;
+        const key = norm(row.name);
+        seen[key] = (seen[key] || 0) + 1;
+        if (used.has(row.box) || exclude.has(key)) continue;
+        if (!key.includes(kw)) continue;
+        if (seen[key] <= (skip[key] || 0)) continue;          // đã chia sẻ hôm nay
+        if (isChecked(row.box)) {
+          used.add(row.box);
+          picked.push(row.name);
+          continue;
+        }
+        row.box.scrollIntoView({ block: "center" });
+        await human(300, 700);
+        row.box.click();
+        await sleep(500);
+        if (!isChecked(row.box)) {
+          const limit = [...document.querySelectorAll('[role="dialog"]')].some((d) => TEXT.shareLimit.test(d.innerText || ""));
+          if (limit) {
+            step("Facebook báo đã đạt giới hạn số nhóm");
+            break;
+          }
+          continue;
+        }
+        used.add(row.box);
+        picked.push(row.name);
+      }
+      if (picked.length >= share.max) break;
+    }
+    step(`Đã tick ${picked.length} nhóm thêm`);
+
+    await human(800, 1500);
+    const doneBtn = findButtonIn(picker, TEXT.groupsDone);
+    if (doneBtn) {
+      doneBtn.click();
+      step("Bấm \"Xong\"");
+      await human(1500, 2500);
+    } else {
+      step("⚠️ Không thấy nút \"Xong\" trong danh sách nhóm");
+    }
+    return picked;
+  }
+
   try {
     step(`Mở ${location.href}`);
 
@@ -152,11 +312,16 @@ export async function postToWall(job, images, opts) {
 
     // ---------- 2. Mở khung soạn bài ----------
     const trigger = await waitFor(findComposerTrigger, 40000);
-    if (!trigger) return done(false, "ui", "Không tìm thấy ô \"Bạn đang nghĩ gì?\" trên trang cá nhân.");
+    if (!trigger) {
+      if (findButtonIn(document, TEXT.joinGroup)) {
+        return done(false, "not_member", "Tài khoản chưa tham gia nhóm này.");
+      }
+      return done(false, "ui", "Không tìm thấy ô soạn bài (\"Bạn đang nghĩ gì?\" / \"Viết nội dung...\").");
+    }
     trigger.scrollIntoView({ block: "center" });
     await human(800, 1800);
     trigger.click();
-    step("Đã bấm \"Bạn đang nghĩ gì?\"");
+    step("Đã mở ô soạn bài");
 
     const editor = await waitFor(findEditor, 20000);
     if (!editor) return done(false, "ui", "Khung soạn bài không mở ra.");
@@ -261,6 +426,14 @@ export async function postToWall(job, images, opts) {
     }
     if (!postBtn) return done(false, "ui", "Nút \"Đăng\" không bấm được (có thể ảnh chưa tải xong).");
 
+    // ---------- 5b. Chia sẻ thêm lên nhóm ----------
+    if (opts?.share && Number(opts.share.max) > 0) {
+      await ensureVisible("chọn nhóm");
+      sharedGroups = await shareToGroups(opts.share);
+      postBtn = await waitFor(() => findEnabled(TEXT.post), 20000);
+      if (!postBtn) return done(false, "ui", "Chọn nhóm xong nhưng không quay lại được nút \"Đăng\".");
+    }
+
     if (opts?.dryRun) {
       step("CHẠY THỬ: đã điền xong, KHÔNG bấm Đăng");
       return done(true, "dry_run", "");
@@ -273,7 +446,8 @@ export async function postToWall(job, images, opts) {
     const finished = await waitFor(() => {
       const block = findBlockMessage();
       if (block) return block;
-      return findEditor() ? null : { code: "ok" };
+      const stillOpen = findEditor() || (postBtn.isConnected && isVisible(postBtn));
+      return stillOpen ? null : { code: "ok" };
     }, 120000, 1000);
 
     if (!finished) return done(false, "timeout", "Bấm Đăng rồi nhưng sau 2 phút khung soạn bài vẫn chưa đóng.");

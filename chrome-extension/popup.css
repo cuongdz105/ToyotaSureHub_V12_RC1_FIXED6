@@ -88,3 +88,13 @@ button:disabled { opacity: .55; cursor: wait; }
 }
 .switch input:checked + span { background: var(--ok); }
 .switch input:checked + span::before { transform: translateX(18px); }
+
+.kinds { width: 100%; border-collapse: collapse; font-size: 12px; }
+.kinds th { color: var(--muted); font-weight: 500; font-size: 11px; text-align: center; padding-bottom: 4px; }
+.kinds td { text-align: center; padding: 5px 2px; border-top: 1px solid var(--line); }
+.kinds td:first-child { text-align: left; font-weight: 600; white-space: nowrap; }
+.kinds td.today, .kinds td.pending, .kinds td.next { font-weight: 700; font-size: 14px; }
+.kinds tr.off td { opacity: .45; }
+fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 12px 0 0; padding: 4px 10px 10px; }
+legend { padding: 0 4px; }
+legend .check { margin: 0; font-size: 13px; }

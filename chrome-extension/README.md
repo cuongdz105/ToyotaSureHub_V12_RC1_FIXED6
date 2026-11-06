@@ -68,3 +68,21 @@ Cửa sổ Facebook bị lỗi được **giữ lại** để ông xem Facebook 
 - Chrome phải đang mở (có thể thu nhỏ) thì tiện ích mới chạy.
 - Facebook đổi giao diện thì chỉ cần sửa các mẫu chữ trong `poster.js` (khối `TEXT`).
 - Đăng tự động vẫn là trái điều khoản Facebook; đừng tăng giới hạn quá 5 bài/ngày.
+
+## 👥 Tự đăng hội nhóm (bản 1.1)
+
+Cài đặt đăng bài → tick **👥 Tự đăng hội nhóm**.
+
+Mỗi lần đăng: tiện ích lấy 1 job nhóm đang chờ của tài khoản → mở nhóm chính
+của job → dán bài + ảnh → **Tiếp** → **Chia sẻ lên nhóm** → *không gõ tìm kiếm*
+(máy tính chỉ trả 10 kết quả), mà **cuộn hết danh sách** rồi tick từ trên xuống
+các nhóm có **dòng xe** trong tên (vd "camry"), thiếu thì dùng **từ khoá dự phòng**
+→ **Xong** → **Đăng**. 1 lần đăng = 1 + 10 nhóm.
+
+- Nhóm trùng tên vẫn được tick (là nhóm khác nhau).
+- Bỏ qua nhóm đã đăng **tính riêng từng xe**: Camry đã vào nhóm "Vios, Altis, Camry…"
+  thì Camry không vào lại hôm đó, nhưng Vios vẫn vào được nhóm đó.
+- Đề xuất: tài khoản phụ 6 lần/ngày, tài khoản chính 3 lần/ngày, cách nhau 40–70 phút.
+- **🧪 Thử nhóm**: làm hết các bước kể cả tick nhóm, nhưng KHÔNG bấm Đăng.
+- Job nhóm ông muốn tự đăng tay thì bấm "Xử lý bài này" trên FB Queue như cũ —
+  job đã chuyển trạng thái thì tiện ích không đụng tới.

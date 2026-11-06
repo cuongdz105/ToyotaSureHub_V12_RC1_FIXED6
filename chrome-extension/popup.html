@@ -10,9 +10,9 @@
     <img src="icons/icon48.png" alt="" width="28" height="28" />
     <div>
       <h1>ToyotaSureHub Auto Wall</h1>
-      <p class="sub">Tự đăng bài lên tường cá nhân</p>
+      <p class="sub">Tự đăng tường cá nhân &amp; hội nhóm</p>
     </div>
-    <label class="switch" title="Bật / tắt tự động đăng">
+    <label class="switch" title="Công tắc tổng: bật / tắt tự động đăng">
       <input type="checkbox" id="enabled" />
       <span></span>
     </label>
@@ -22,14 +22,22 @@
 
   <!-- TRẠNG THÁI -->
   <section id="statusBox" class="card">
-    <div class="stats">
-      <div><b id="sToday">–</b><span>đã đăng hôm nay</span></div>
-      <div><b id="sPending">–</b><span>bài đang chờ</span></div>
-      <div><b id="sNext">–</b><span>lượt kế tiếp</span></div>
-    </div>
+    <table class="kinds">
+      <thead>
+        <tr><th></th><th>Hôm nay</th><th>Đang chờ</th><th>Lượt kế tiếp</th></tr>
+      </thead>
+      <tbody>
+        <tr id="rowProfile"><td>🧱 Tường</td><td class="today">–</td><td class="pending">–</td><td class="next">–</td></tr>
+        <tr id="rowGroup"><td>👥 Nhóm</td><td class="today">–</td><td class="pending">–</td><td class="next">–</td></tr>
+      </tbody>
+    </table>
+    <p class="hint" id="sharedInfo"></p>
     <div class="row">
       <button id="runNow" class="primary">▶ Đăng 1 bài ngay</button>
-      <button id="dryRun">🧪 Chạy thử</button>
+    </div>
+    <div class="row">
+      <button id="dryWall">🧪 Thử tường</button>
+      <button id="dryGroup">🧪 Thử nhóm</button>
     </div>
     <p id="runMsg" class="msg"></p>
   </section>
@@ -57,15 +65,35 @@
       <select id="accountId"><option value="">— Đăng nhập để tải danh sách —</option></select>
     </label>
     <p class="hint">Mỗi hồ sơ Chrome đăng nhập 1 Facebook → chọn đúng tài khoản tương ứng.</p>
-    <div class="grid2">
-      <label>Tối đa bài/ngày<input id="dailyLimit" type="number" min="1" max="10" /></label>
-      <label>Giờ hoạt động
-        <span class="inline"><input id="activeFrom" type="number" min="0" max="23" /> – <input id="activeTo" type="number" min="1" max="24" /></span>
-      </label>
-      <label>Cách nhau ít nhất (phút)<input id="gapMinMinutes" type="number" min="15" /></label>
-      <label>Cách nhau nhiều nhất (phút)<input id="gapMaxMinutes" type="number" min="15" /></label>
-    </div>
+    <label>Giờ hoạt động
+      <span class="inline"><input id="activeFrom" type="number" min="0" max="23" /> – <input id="activeTo" type="number" min="1" max="24" /> giờ</span>
+    </label>
     <label class="check"><input id="closeWindowOnSuccess" type="checkbox" /> Tự đóng cửa sổ Facebook sau khi đăng xong</label>
+
+    <fieldset>
+      <legend><label class="check"><input id="wallEnabled" type="checkbox" /> 🧱 Tự đăng tường cá nhân</label></legend>
+      <div class="grid2">
+        <label>Tối đa bài/ngày<input id="dailyLimit" type="number" min="1" max="10" /></label>
+        <span></span>
+        <label>Cách nhau ít nhất (phút)<input id="gapMinMinutes" type="number" min="15" /></label>
+        <label>Nhiều nhất (phút)<input id="gapMaxMinutes" type="number" min="15" /></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend><label class="check"><input id="groupEnabled" type="checkbox" /> 👥 Tự đăng hội nhóm</label></legend>
+      <div class="grid2">
+        <label>Tối đa lần đăng/ngày<input id="groupDailyLimit" type="number" min="1" max="40" /></label>
+        <label>Chia sẻ thêm (nhóm/lần)<input id="groupExtraCount" type="number" min="0" max="10" /></label>
+        <label>Cách nhau ít nhất (phút)<input id="groupGapMinMinutes" type="number" min="5" /></label>
+        <label>Nhiều nhất (phút)<input id="groupGapMaxMinutes" type="number" min="5" /></label>
+      </div>
+      <label>Từ khoá dự phòng (cách nhau dấu phẩy)<input id="groupFallbackKeywords" type="text" placeholder="toyota" /></label>
+      <p class="hint">Mỗi lần: đăng nhóm chính của job, rồi tick thêm các nhóm có <b>dòng xe</b> trong tên (vd "camry"),
+        thiếu thì dùng từ khoá dự phòng. Cùng 1 xe không đăng lại vào nhóm đã đăng hôm nay; xe khác vẫn đăng được vào nhóm đó.</p>
+      <p class="hint" id="groupTotal"></p>
+    </fieldset>
+
     <button id="save" class="primary full">Lưu cài đặt</button>
   </details>
 
