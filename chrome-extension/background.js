@@ -570,13 +570,36 @@ async function runJob(job, kind, settings) {
     notify("ToyotaSureHub Auto Wall đã TẠM DỪNG", result.reason);
     await log(`⛔ Tạm dừng tự động: ${result.reason}`, "error");
   } else {
-    await patchKind(kind, { nextAllowedAt: Date.now() + 10 * 60000 });
+    if (result.code === "not_member") await disableGroup(job, settings, result.reason);
+    // Lỗi chắc chắn không đăng được (chưa vào nhóm, thiếu link...) → chuyển job kế tiếp sau 1 phút, không bắt chờ 10 phút
+    await patchKind(kind, { nextAllowedAt: Date.now() + (permanent ? 1 : 10) * 60000 });
     await log(`❌ ${KIND_LABEL[kind]}: ${result.reason} → ${nextStatus === "pending" ? "sẽ thử lại" : nextStatus === "manual_ready" ? "chờ ông kiểm tra" : "báo Thất bại"}`, "error");
     // Lỗi chắc chắn không đăng (chưa vào nhóm, thiếu link...) thì đóng cửa sổ luôn
     if (permanent && opened) chrome.windows.remove(opened.windowId).catch(() => {});
   }
   // Các lỗi khác giữ cửa sổ lại để ông xem Facebook đang hiện gì
   return { ok: false, reason: result.reason };
+}
+
+// Tài khoản chưa vào nhóm → tắt nhóm (status = inactive) để không tạo job vào đó nữa,
+// và bỏ qua luôn các job đang chờ khác của cùng nhóm + cùng tài khoản.
+async function disableGroup(job, settings, reason) {
+  if (!job.group_id) return;
+  const accountName = job.payload?.account?.name || settings.accountName || "tài khoản";
+  try {
+    const rows = await rest("GET", `facebook_groups?select=id,notes&id=eq.${job.group_id}&limit=1`);
+    const note = `[${new Date().toLocaleDateString("vi-VN")}] Tiện ích tự tắt: ${accountName} chưa là thành viên nhóm.`;
+    const notes = [rows?.[0]?.notes, note].filter(Boolean).join("\n");
+    await rest("PATCH", `facebook_groups?id=eq.${job.group_id}`, { status: "inactive", notes });
+    const others = await rest(
+      "PATCH",
+      `facebook_queue?group_id=eq.${job.group_id}&account_id=eq.${encodeURIComponent(job.account_id || settings.accountId)}&status=eq.pending&id=neq.${job.id}`,
+      { status: "failed", error_reason: reason, updated_at: new Date().toISOString() }
+    );
+    await log(`⛔ Đã tắt nhóm "${job.payload?.group?.name || job.group_id}" (chưa là thành viên)${others?.length ? `, bỏ qua thêm ${others.length} job cùng nhóm` : ""}.`, "warn");
+  } catch (error) {
+    await log("Không tắt được nhóm chưa tham gia: " + error.message, "warn");
+  }
 }
 
 async function writeReport(job, kind, settings, shared, carHint) {
