@@ -439,6 +439,11 @@ const MODEL_KEYWORDS = [
   ["lexus", "lexus"],
 ];
 
+// Cụm cần loại khi tìm theo từ khoá (tên nhóm có cụm này thì không tính)
+const KEYWORD_BLOCKERS = {
+  cross: ["innova cross", "yaris cross", "veloz cross", "xpander cross", "zenix cross"],
+};
+
 function modelKeyword(model) {
   const m = norm(model);
   if (!m) return "";
@@ -470,7 +475,7 @@ async function prepare(job, kind, settings, { dryRun = false } = {}) {
     opts: {
       dryRun,
       share: max > 0 && keywords.length
-        ? { keywords, max, skip: await sharedToday(job.car_id), exclude: [job.payload?.group?.name || ""] }
+        ? { keywords, max, skip: await sharedToday(job.car_id), exclude: [job.payload?.group?.name || ""], blockers: KEYWORD_BLOCKERS }
         : null,
     },
   };
@@ -664,7 +669,7 @@ async function dryRun(kind) {
   }
 
   const prep = await prepare(job, kind, settings, { dryRun: true });
-  const urls = (await resolveImageUrls(job)).slice(0, 3);
+  const urls = await resolveImageUrls(job); // chạy thử lấy đủ ảnh như đăng thật
   const images = await fetchImages(urls);
   const opened = await openFacebook(prep.url);
   await chrome.windows.update(opened.windowId, { focused: true });

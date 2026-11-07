@@ -304,6 +304,15 @@ export async function postToFacebook(job, images, opts) {
     const picked = [];
     const used = new Set();
 
+    // Bỏ các cụm "xe khác" khỏi tên nhóm trước khi tìm từ khoá
+    // (vd từ khoá "cross" không ăn vào "Innova Cross", "Yaris Cross"...)
+    const blockers = share.blockers || {};
+    const matchesKw = (key, kw) => {
+      let k = " " + key.replace(/[-_]/g, " ").replace(/\s+/g, " ") + " ";
+      for (const b of blockers[kw] || []) k = k.split(norm(b)).join(" ");
+      return k.includes(kw);
+    };
+
     for (const kw of keywords) {
       const seen = {};
       for (const row of rows) {
@@ -311,7 +320,7 @@ export async function postToFacebook(job, images, opts) {
         const key = norm(row.name);
         seen[key] = (seen[key] || 0) + 1;
         if (used.has(row.box) || exclude.has(key)) continue;
-        if (!key.includes(kw)) continue;
+        if (!matchesKw(key, kw)) continue;
         if (seen[key] <= (skip[key] || 0)) continue;          // đã chia sẻ hôm nay
         if (isChecked(row.box)) {
           used.add(row.box);
