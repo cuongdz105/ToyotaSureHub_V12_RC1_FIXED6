@@ -26,6 +26,10 @@ export async function postToFacebook(job, images, opts) {
     groupsDone: /^(xong|done|lưu|save|áp dụng|apply|chọn|select|ok)$/i,
     shareLimit: /(đạt đến giới hạn|reached the limit|giới hạn chia sẻ|sharing limit)/i,
     joinGroup: /^(tham gia nhóm|join group)$/i,
+    joinPending: /^(hủy yêu cầu|cancel request|đã gửi yêu cầu|request sent)$/i,
+    // Hộp "Xem xét quyền tham gia" / câu hỏi khi xin vào nhóm
+    joinQuestions: /(xem xét quyền tham gia|trả lời (những |các |một số )?câu hỏi|câu hỏi (của quản trị viên|tham gia)|participant questions|membership questions|answer (these |some |the )?questions)/i,
+    close: /^(đóng|close|hủy|cancel)$/i,
     photo: /^(ảnh\/video|photo\/video|ảnh|photo)$/i,
     post: /^(đăng|post)$/i,
     next: /^(tiếp|next)$/i,
@@ -104,9 +108,43 @@ export async function postToFacebook(job, images, opts) {
     return null;
   }
 
+  // Hộp xin vào nhóm (có câu hỏi / nút Gửi) — KHÔNG phải khung soạn bài
+  function findJoinDialog() {
+    for (const node of document.querySelectorAll('[role="dialog"]')) {
+      if (!isVisible(node)) continue;
+      const head = (node.innerText || "").slice(0, 600);
+      if (TEXT.joinQuestions.test(head)) return node;
+    }
+    return null;
+  }
+
+  // Nút "Tham gia nhóm" / "Hủy yêu cầu" ở phần đầu trang nhóm (không tính
+  // các thẻ "nhóm gợi ý" trong bảng tin hay cột bên)
+  function findJoinButton() {
+    for (const el of document.querySelectorAll('[role="button"], button')) {
+      if (!isVisible(el)) continue;
+      if (el.closest('[role="feed"], [role="complementary"], [role="dialog"], [role="article"]')) continue;
+      const label = labelOf(el);
+      if (!TEXT.joinGroup.test(label) && !TEXT.joinPending.test(label)) continue;
+      if (el.getBoundingClientRect().top + window.scrollY > 900) continue;
+      return el;
+    }
+    return null;
+  }
+
+  function closeJoinDialog(node) {
+    const btn = findButtonIn(node, TEXT.close);
+    if (btn) btn.click();
+  }
+
   function findEditor() {
     const editors = document.querySelectorAll('[role="dialog"] [contenteditable="true"][role="textbox"]');
-    for (const el of editors) if (isVisible(el)) return el;
+    for (const el of editors) {
+      if (!isVisible(el)) continue;
+      const dlg = el.closest('[role="dialog"]');
+      if (dlg && TEXT.joinQuestions.test((dlg.innerText || "").slice(0, 600))) continue; // ô trả lời câu hỏi
+      return el;
+    }
     return null;
   }
 
@@ -326,11 +364,22 @@ export async function postToFacebook(job, images, opts) {
     if (earlyBlock) return done(false, "blocked", "Facebook báo đang chặn tính năng: " + earlyBlock.text.slice(0, 200));
 
     // ---------- 2. Mở khung soạn bài ----------
+    const notMember = (why) => {
+      const dlg = findJoinDialog();
+      if (dlg) closeJoinDialog(dlg);
+      return done(false, "not_member", `Tài khoản chưa là thành viên nhóm này (${why}).`);
+    };
+    if (/\/groups\//.test(location.pathname)) {
+      // Chờ trang nhóm hiện phần đầu rồi mới xét
+      await waitFor(() => findComposerTrigger() || findJoinButton() || findJoinDialog(), 20000);
+      await sleep(1500);
+      if (findJoinDialog()) return notMember("Facebook bật hộp xin vào nhóm");
+      if (findJoinButton()) return notMember("trang còn nút \"Tham gia nhóm\"");
+    }
+
     const trigger = await waitFor(findComposerTrigger, 40000);
     if (!trigger) {
-      if (findButtonIn(document, TEXT.joinGroup)) {
-        return done(false, "not_member", "Tài khoản chưa tham gia nhóm này.");
-      }
+      if (findJoinButton() || findButtonIn(document, TEXT.joinGroup)) return notMember("không có ô soạn bài");
       return done(false, "ui", "Không tìm thấy ô soạn bài (\"Bạn đang nghĩ gì?\" / \"Viết nội dung...\").");
     }
     trigger.scrollIntoView({ block: "center" });
@@ -338,7 +387,9 @@ export async function postToFacebook(job, images, opts) {
     trigger.click();
     step("Đã mở ô soạn bài");
 
-    const editor = await waitFor(findEditor, 20000);
+    const opened = await waitFor(() => (findJoinDialog() ? "join" : findEditor() ? "editor" : null), 20000);
+    if (opened === "join") return notMember("bấm ô soạn bài thì Facebook đòi trả lời câu hỏi tham gia");
+    const editor = findEditor();
     if (!editor) return done(false, "ui", "Khung soạn bài không mở ra.");
     const dialog = editor.closest('[role="dialog"]') || document;
     await human(1000, 2000);
