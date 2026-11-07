@@ -1,0 +1,79 @@
+/* Thu mua xe — thiết kế ưu tiên điện thoại */
+.pl-page { max-width: 760px; margin: 0 auto; padding: 16px 14px 80px !important; }
+.pl-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 6px 0 14px 44px; }
+.pl-header h1 { font-size: 21px; color: #111; }
+.pl-back { color: #d71920; text-decoration: none; font-size: 14px; }
+
+.pl-card { background: #fff; border-radius: 12px; padding: 14px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+.pl-empty p { color: #555; line-height: 1.5; margin-bottom: 6px; }
+
+.pl-input, .pl-search, .pl-grid input, .pl-grid select, .pl-grid textarea {
+  width: 100%; border: 1px solid #d6d9de; border-radius: 9px; padding: 11px 12px;
+  font-size: 16px; /* >=16px để iPhone không tự phóng to */ background: #fff; color: #111;
+}
+.pl-input { resize: vertical; }
+.pl-search { margin-bottom: 10px; }
+
+.pl-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.pl-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 14px; border-radius: 9px; border: 1px solid #d6d9de; background: #fff;
+  color: #222; font-size: 15px; text-decoration: none; cursor: pointer; white-space: nowrap;
+}
+.pl-btn:disabled { opacity: .6; }
+.pl-btn.primary { background: #d71920; border-color: #d71920; color: #fff; font-weight: 600; }
+.pl-btn.ghost { flex: 1; }
+.pl-btn.full { width: 100%; margin-top: 10px; padding: 13px; }
+.pl-btn.danger { color: #b91c1c; border-color: #fca5a5; }
+.pl-btn.call { background: #16a34a; border-color: #16a34a; color: #fff; font-weight: 600; flex: 1; }
+.pl-btn.zalo { background: #0068ff; border-color: #0068ff; color: #fff; font-weight: 600; }
+
+.pl-msg { color: #555; font-size: 14px; margin-top: 8px; }
+.pl-warn { background: #fff7ed; color: #9a3412; border-radius: 8px; padding: 9px 11px; font-size: 14px; margin-bottom: 10px; }
+.pl-dup { background: #eff6ff; border-radius: 8px; padding: 9px 11px; font-size: 14px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 4px; }
+.pl-dup a { color: #1d4ed8; }
+
+.pl-preview { position: relative; margin-top: 10px; }
+.pl-preview img { width: 100%; max-height: 320px; object-fit: contain; border-radius: 8px; background: #f3f4f6; }
+.pl-x { position: absolute; top: 6px; right: 6px; border: none; background: rgba(0,0,0,.6); color: #fff; border-radius: 50%; width: 30px; height: 30px; font-size: 15px; }
+
+.pl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+.pl-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #555; }
+.pl-grid .span2 { grid-column: span 2; }
+.pl-grid small { color: #16a34a; }
+
+.pl-status-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.pl-status-row.scroll { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+.pl-chip { flex-shrink: 0; border: 1px solid #d6d9de; background: #fff; color: #333; padding: 7px 11px; border-radius: 999px; font-size: 14px; cursor: pointer; }
+.pl-chip.on { background: #111; border-color: #111; color: #fff; }
+.pl-chip.due { border-color: #f59e0b; color: #b45309; }
+.pl-chip.due.on { background: #f59e0b; color: #fff; }
+
+.pl-list { display: flex; flex-direction: column; gap: 10px; }
+.pl-item { background: #fff; border-radius: 12px; padding: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+.pl-item.open { box-shadow: 0 2px 10px rgba(0,0,0,.12); }
+.pl-item-head { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.pl-item-main { flex: 1; min-width: 0; }
+.pl-item-title { font-weight: 700; font-size: 16px; color: #111; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pl-item-sub { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 13px; color: #666; margin-top: 4px; }
+.pl-item-sub b { color: #d71920; }
+.pl-badge { color: #fff; font-size: 12px; padding: 4px 8px; border-radius: 999px; white-space: nowrap; }
+.pl-tag { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 999px; }
+.pl-tag.dealer { background: #fee2e2; color: #b91c1c; }
+.pl-tag.ind { background: #dcfce7; color: #15803d; }
+.pl-actions { display: flex; gap: 8px; margin-top: 10px; }
+
+.pl-detail { border-top: 1px solid #eee; margin-top: 12px; padding-top: 12px; }
+.pl-facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 14px; margin-bottom: 8px; }
+.pl-facts dt { color: #777; }
+.pl-facts dd { color: #111; word-break: break-word; }
+.pl-facts a { color: #1d4ed8; }
+.pl-desc { font-size: 14px; color: #333; background: #f9fafb; border-radius: 8px; padding: 8px 10px; margin: 8px 0; }
+.pl-shot img { width: 100%; max-height: 360px; object-fit: contain; border-radius: 8px; background: #f3f4f6; margin: 6px 0 10px; }
+.pl-log { list-style: none; margin-top: 12px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.pl-log li { display: flex; flex-wrap: wrap; gap: 6px; color: #555; border-left: 3px solid #e5e7eb; padding-left: 8px; }
+.pl-log em { color: #111; font-style: normal; flex-basis: 100%; }
+
+@media (min-width: 901px) {
+  .pl-header { margin-left: 0; }
+}

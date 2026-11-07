@@ -37,6 +37,10 @@ function Sidebar({ isOpen, onClose }) {
         <button>👤 Facebook Accounts</button>
       </Link>
 
+      <Link to="/purchase-leads" onClick={onClose}>
+        <button>🔎 Thu mua xe</button>
+      </Link>
+
       <Link to="/customers" onClick={onClose}>
         <button>👥 Khách hàng</button>
       </Link>

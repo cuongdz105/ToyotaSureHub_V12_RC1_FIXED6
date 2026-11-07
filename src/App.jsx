@@ -13,6 +13,8 @@ import MainLayout from "./layouts/MainLayout";
 import AIWorkspace from "./pages/AIWorkspace";
 import CampaignPage from "./pages/CampaignPage";
 import Report from "./pages/Report";
+import PurchaseLeads from "./pages/PurchaseLeads/PurchaseLeads";
+import PurchaseLeadNew from "./pages/PurchaseLeads/PurchaseLeadNew";
 
 import FacebookAccounts from "./pages/Facebook/FacebookAccounts";
 import FacebookGroups from "./pages/Facebook/FacebookGroups";
@@ -135,6 +137,17 @@ function App() {
         <Route
           path="/report"
           element={<Report />}
+        />
+
+        {/* Thu mua xe */}
+        <Route
+          path="/purchase-leads"
+          element={<PurchaseLeads />}
+        />
+
+        <Route
+          path="/purchase-leads/new"
+          element={<PurchaseLeadNew />}
         />
 
         {/* =================================
