@@ -96,27 +96,32 @@ async function fileToCompressedDataUrl(file) {
     return { blob: compressed, dataUrl };
 }
 
+export const MAX_LEAD_SCREENSHOTS = 6;
+
 /**
- * Đọc 1 tin: truyền { text } hoặc { url } hoặc { file } (ảnh chụp màn hình).
- * Có thể truyền kèm url + file (link FB + ảnh chụp).
+ * Đọc 1 tin: truyền { text } hoặc { url } hoặc { file } / { files } (1 hay nhiều ảnh chụp
+ * màn hình CỦA CÙNG 1 TIN, vd bài dài phải chụp 2-3 lần, hoặc ảnh bài + ảnh bình luận có SĐT).
+ * Có thể truyền kèm url + ảnh (link FB + ảnh chụp).
  */
-export async function parseLead({ text = "", url = "", file = null } = {}) {
-    let image = "";
-    let blob = null;
-    if (file) {
-        const r = await fileToCompressedDataUrl(file);
-        image = r.dataUrl;
-        blob = r.blob;
+export async function parseLead({ text = "", url = "", file = null, files = null } = {}) {
+    const list = (files && files.length ? Array.from(files) : file ? [file] : []).slice(0, MAX_LEAD_SCREENSHOTS);
+    const images = [];
+    const blobs = [];
+    for (const f of list) {
+        const r = await fileToCompressedDataUrl(f);
+        images.push(r.dataUrl);
+        blobs.push(r.blob);
     }
 
     const { data, error } = await supabase.functions.invoke("parse-purchase-lead", {
-        body: { text, url, image },
+        // "image" giữ cho bản edge function cũ (chỉ đọc 1 ảnh); bản mới đọc cả "images"
+        body: { text, url, image: images[0] || "", images },
     });
 
     if (error) throw new Error(error.message || "Không đọc được tin.");
     if (data?.error) throw new Error(data.error);
 
-    return { ...data, _imageBlob: blob };
+    return { ...data, _imageBlob: blobs[0] || null, _imageBlobs: blobs };
 }
 
 // ---------- ảnh ----------
@@ -207,12 +212,27 @@ function pickRow(lead) {
     return row;
 }
 
+/**
+ * imageBlob: 1 ảnh chụp, hoặc mảng nhiều ảnh chụp. Ảnh đầu là ảnh chụp chính của tin,
+ * các ảnh sau lưu vào mục "Ảnh & giấy tờ" (loại Khác) của tin đó.
+ */
 export async function createLead(lead, imageBlob = null) {
+    const blobs = (Array.isArray(imageBlob) ? imageBlob : [imageBlob]).filter(Boolean);
     const row = pickRow(lead);
-    if (imageBlob) row.screenshot_path = await uploadScreenshot(imageBlob);
+    if (blobs[0]) row.screenshot_path = await uploadScreenshot(blobs[0]);
     row.contact_log = [{ at: new Date().toISOString(), status: row.status || "new", note: "Thêm tin" }];
     const { data, error } = await supabase.from(TABLE).insert(row).select().single();
     if (error) throw error;
+    if (blobs.length > 1) {
+        const extra = blobs.slice(1).map(
+            (b, i) => new File([b], `anh-chup-${i + 2}.jpg`, { type: b.type || "image/jpeg" })
+        );
+        try {
+            await addLeadImages(data.id, extra, "other");
+        } catch (e) {
+            console.warn("Không lưu được các ảnh chụp thêm", e);
+        }
+    }
     return data;
 }
 
