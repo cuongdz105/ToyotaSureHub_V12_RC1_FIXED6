@@ -2,7 +2,7 @@
 // Thu mua xe — Danh sách chăm sóc
 // ==========================================
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
     listLeads,
@@ -16,6 +16,12 @@ import {
     normalizePhone,
     LEAD_STATUSES,
     SELLER_TYPES,
+    IMAGE_CATEGORIES,
+    listLeadImages,
+    addLeadImages,
+    updateLeadImage,
+    deleteLeadImage,
+    countLeadImages,
 } from "../../services/purchaseLeadService";
 import "./purchaseLeads.css";
 
@@ -41,8 +47,194 @@ function toLocalInput(iso) {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// ---------- Ảnh & giấy tờ khách gửi ----------
+function LeadImages({ lead, onCountChange, onLogged }) {
+    const [images, setImages] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+    const [category, setCategory] = useState("car");
+    const [filter, setFilter] = useState("");
+    const [progress, setProgress] = useState("");
+    const [viewIndex, setViewIndex] = useState(-1);
+    const fileRef = useRef(null);
+
+    const load = useCallback(async () => {
+        setLoading(true);
+        setError("");
+        try {
+            const list = await listLeadImages(lead.id);
+            setImages(list);
+            onCountChange(list.length);
+        } catch (e) {
+            setError(e.message);
+        } finally {
+            setLoading(false);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [lead.id]);
+
+    useEffect(() => {
+        load();
+    }, [load]);
+
+    async function onFiles(e) {
+        const files = Array.from(e.target.files || []);
+        e.target.value = "";
+        if (!files.length) return;
+        setProgress(`Đang tải 0/${files.length}...`);
+        try {
+            await addLeadImages(lead.id, files, category, (d, t) => setProgress(`Đang tải ${d}/${t}...`));
+            const label = IMAGE_CATEGORIES.find((c) => c.value === category)?.label.replace(/^\S+\s/, "") || "";
+            try {
+                const updated = await updateLead(lead.id, {}, { logNote: `Thêm ${files.length} ảnh ${label.toLowerCase()}` });
+                onLogged(updated);
+            } catch {
+                // ghi nhật ký lỗi thì bỏ qua
+            }
+            setFilter("");
+            await load();
+        } catch (err) {
+            alert("Lỗi tải ảnh: " + err.message);
+        } finally {
+            setProgress("");
+        }
+    }
+
+    const counts = useMemo(() => {
+        const c = {};
+        for (const i of images) c[i.category] = (c[i.category] || 0) + 1;
+        return c;
+    }, [images]);
+
+    const shown = filter ? images.filter((i) => i.category === filter) : images;
+    const viewing = viewIndex >= 0 ? shown[viewIndex] : null;
+
+    async function changeCategory(img, value) {
+        await updateLeadImage(img.id, { category: value });
+        setImages((all) => all.map((x) => (x.id === img.id ? { ...x, category: value } : x)));
+    }
+
+    async function remove(img) {
+        if (!window.confirm("Xoá ảnh này?")) return;
+        await deleteLeadImage(img);
+        setViewIndex(-1);
+        const next = images.filter((x) => x.id !== img.id);
+        setImages(next);
+        onCountChange(next.length);
+    }
+
+    const isPdf = (img) => (img.mime_type || "").includes("pdf");
+
+    return (
+        <div className="pl-images">
+            <div className="pl-images-title">📷 Ảnh & giấy tờ khách gửi</div>
+
+            {error ? (
+                <p className="pl-warn">
+                    Chưa dùng được mục ảnh: {error}. Ông chạy file SQL 20261107b_purchase_lead_images.sql nhé.
+                </p>
+            ) : (
+                <>
+                    <div className="pl-status-row scroll">
+                        {IMAGE_CATEGORIES.map((c) => (
+                            <button
+                                key={c.value}
+                                type="button"
+                                className={`pl-chip${category === c.value ? " on" : ""}`}
+                                onClick={() => setCategory(c.value)}
+                            >
+                                {c.label}
+                            </button>
+                        ))}
+                    </div>
+                    <button
+                        type="button"
+                        className="pl-btn primary full"
+                        disabled={!!progress}
+                        onClick={() => fileRef.current?.click()}
+                    >
+                        {progress || `➕ Thêm ảnh vào "${IMAGE_CATEGORIES.find((c) => c.value === category)?.label}"`}
+                    </button>
+                    <input
+                        ref={fileRef}
+                        type="file"
+                        accept="image/*,application/pdf"
+                        multiple
+                        hidden
+                        onChange={onFiles}
+                    />
+
+                    {images.length > 0 && (
+                        <div className="pl-status-row scroll" style={{ marginTop: 10 }}>
+                            <button type="button" className={`pl-chip${!filter ? " on" : ""}`} onClick={() => setFilter("")}>
+                                Tất cả {images.length}
+                            </button>
+                            {IMAGE_CATEGORIES.filter((c) => counts[c.value]).map((c) => (
+                                <button
+                                    key={c.value}
+                                    type="button"
+                                    className={`pl-chip${filter === c.value ? " on" : ""}`}
+                                    onClick={() => setFilter(c.value)}
+                                >
+                                    {c.label} {counts[c.value]}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {loading && <p className="pl-msg">Đang tải ảnh...</p>}
+                    <div className="pl-thumbs">
+                        {shown.map((img, i) => (
+                            <button key={img.id} type="button" className="pl-thumb" onClick={() => setViewIndex(i)}>
+                                {isPdf(img) ? <span className="pl-pdf">📄 PDF</span> : <img src={img.url} alt="" loading="lazy" />}
+                                {img.category === "papers" && <span className="pl-thumb-tag">Giấy tờ</span>}
+                            </button>
+                        ))}
+                    </div>
+                </>
+            )}
+
+            {viewing && (
+                <div className="pl-viewer" onClick={() => setViewIndex(-1)}>
+                    <div className="pl-viewer-body" onClick={(e) => e.stopPropagation()}>
+                        {isPdf(viewing) ? (
+                            <a className="pl-btn primary" href={viewing.url} target="_blank" rel="noreferrer">Mở file PDF</a>
+                        ) : (
+                            <img src={viewing.url} alt="" />
+                        )}
+                        <div className="pl-viewer-bar">
+                            <button type="button" className="pl-btn" disabled={viewIndex <= 0} onClick={() => setViewIndex(viewIndex - 1)}>‹</button>
+                            <select value={viewing.category} onChange={(e) => changeCategory(viewing, e.target.value)}>
+                                {IMAGE_CATEGORIES.map((c) => (
+                                    <option key={c.value} value={c.value}>{c.label}</option>
+                                ))}
+                            </select>
+                            <button
+                                type="button"
+                                className="pl-btn"
+                                disabled={viewIndex >= shown.length - 1}
+                                onClick={() => setViewIndex(viewIndex + 1)}
+                            >
+                                ›
+                            </button>
+                        </div>
+                        <div className="pl-viewer-bar">
+                            <a className="pl-btn" href={viewing.url} target="_blank" rel="noreferrer">Mở ảnh gốc</a>
+                            <button type="button" className="pl-btn danger" onClick={() => remove(viewing)}>Xoá</button>
+                            <button type="button" className="pl-btn" onClick={() => setViewIndex(-1)}>Đóng</button>
+                        </div>
+                        <p className="pl-msg" style={{ color: "#ddd", textAlign: "center" }}>
+                            {viewIndex + 1}/{shown.length}
+                        </p>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 // ---------- Chi tiết 1 tin ----------
-function LeadDetail({ lead, onChanged, onDeleted }) {
+function LeadDetail({ lead, onChanged, onDeleted, onImageCount }) {
     const [note, setNote] = useState("");
     const [offer, setOffer] = useState(lead.offered_price ? formatPrice(lead.offered_price) : "");
     const [deal, setDeal] = useState(lead.deal_price ? formatPrice(lead.deal_price) : "");
@@ -124,6 +316,8 @@ function LeadDetail({ lead, onChanged, onDeleted }) {
                 </a>
             )}
 
+            <LeadImages lead={lead} onCountChange={onImageCount} onLogged={onChanged} />
+
             <div className="pl-grid">
                 <label>
                     Giá mình trả
@@ -190,12 +384,15 @@ export default function PurchaseLeads() {
     const [status, setStatus] = useState("");
     const [search, setSearch] = useState("");
     const [openId, setOpenId] = useState(params.get("open") || "");
+    const [imageCounts, setImageCounts] = useState({});
 
     const load = useCallback(async () => {
         setLoading(true);
         setError("");
         try {
-            setLeads(await listLeads());
+            const [list, counts] = await Promise.all([listLeads(), countLeadImages()]);
+            setLeads(list);
+            setImageCounts(counts);
         } catch (e) {
             setError(e.message);
         } finally {
@@ -309,6 +506,7 @@ export default function PurchaseLeads() {
                                         {carTitle(l)}
                                         {l.seller_type === "dealer" && <span className="pl-tag dealer">salon/cò</span>}
                                         {l.seller_type === "individual" && <span className="pl-tag ind">xe dân</span>}
+                                        {imageCounts[l.id] > 0 && <span className="pl-tag img">📷 {imageCounts[l.id]}</span>}
                                         {many && <span className="pl-tag dealer">số đăng {phoneCount[l.phone_normalized]} xe</span>}
                                     </div>
                                     <div className="pl-item-sub">
@@ -335,6 +533,7 @@ export default function PurchaseLeads() {
                                     lead={l}
                                     onChanged={(u) => setLeads((all) => all.map((x) => (x.id === u.id ? u : x)))}
                                     onDeleted={(id) => setLeads((all) => all.filter((x) => x.id !== id))}
+                                    onImageCount={(n) => setImageCounts((c) => ({ ...c, [l.id]: n }))}
                                 />
                             )}
                         </article>

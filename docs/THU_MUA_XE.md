@@ -5,6 +5,7 @@ Menu mới: **Thu mua xe** (`/purchase-leads`). Mỗi tin lưu: SĐT, người b
 ## 1. Cài đặt (làm 1 lần)
 
 1. **Supabase → SQL Editor**: chạy file `supabase/migrations/20261107_purchase_leads.sql`.
+1b. Chạy tiếp file `supabase/migrations/20261107b_purchase_lead_images.sql` (mục Ảnh & giấy tờ).
 2. **Deploy edge function** (dùng chung secret `OPENAI_API_KEY` đã có):
    ```
    supabase functions deploy parse-purchase-lead
@@ -34,6 +35,7 @@ Sau khi AI đọc: kiểm tra lại các ô → **Lưu & thêm tiếp**.
 
 - App tự cảnh báo **tin trùng** (cùng SĐT hoặc cùng link) và **salon/cò** (AI nhận diện, hoặc 1 số đăng nhiều xe).
 - Trong danh sách: bấm **📞** để gọi, **Zalo** để nhắn, bấm vào xe để đổi trạng thái, ghi giá trả / giá chốt / hẹn gọi lại.
+- **Ảnh & giấy tờ khách gửi** (trong từng tin): chọn loại (Ngoại thất, Nội thất/ODO, Giấy tờ, Lỗi/trầy, Khác) → **➕ Thêm ảnh** → chọn nhiều ảnh/PDF một lúc. Ảnh khách gửi qua Zalo: giữ ảnh → Lưu vào máy, rồi chọn từ Thư viện. Bấm ảnh để xem to, đổi loại hoặc xoá.
 - Nút **⏰ Cần gọi lại** hiện các xe đến hẹn.
 
 ## 4. Lưu ý

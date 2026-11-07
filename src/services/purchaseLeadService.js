@@ -236,7 +236,108 @@ export async function updateLead(id, patch, { logNote } = {}) {
 }
 
 export async function deleteLead(lead) {
-    if (lead.screenshot_path) await supabase.storage.from(BUCKET).remove([lead.screenshot_path]);
+    const paths = [];
+    if (lead.screenshot_path) paths.push(lead.screenshot_path);
+    try {
+        const imgs = await listLeadImages(lead.id);
+        paths.push(...imgs.map((i) => i.storage_path));
+    } catch {
+        // bảng ảnh chưa có thì bỏ qua
+    }
+    if (paths.length) await supabase.storage.from(BUCKET).remove(paths);
     const { error } = await supabase.from(TABLE).delete().eq("id", lead.id);
+    if (error) throw error;
+}
+
+// ==========================================
+// ẢNH & GIẤY TỜ KHÁCH GỬI (bảng purchase_lead_images)
+// ==========================================
+
+const IMAGES_TABLE = "purchase_lead_images";
+
+export const IMAGE_CATEGORIES = [
+    { value: "car", label: "🚗 Ngoại thất" },
+    { value: "interior", label: "🪑 Nội thất / ODO" },
+    { value: "papers", label: "📄 Giấy tờ" },
+    { value: "damage", label: "⚠️ Lỗi / trầy" },
+    { value: "other", label: "📎 Khác" },
+];
+
+export async function listLeadImages(leadId) {
+    const { data, error } = await supabase
+        .from(IMAGES_TABLE)
+        .select("*")
+        .eq("lead_id", leadId)
+        .order("created_at", { ascending: true });
+    if (error) throw error;
+
+    const paths = (data || []).map((r) => r.storage_path);
+    if (!paths.length) return [];
+    const { data: signed } = await supabase.storage.from(BUCKET).createSignedUrls(paths, 60 * 60);
+    const urlByPath = Object.fromEntries((signed || []).map((s) => [s.path, s.signedUrl]));
+    return data.map((r) => ({ ...r, url: urlByPath[r.storage_path] || "" }));
+}
+
+/** Đếm số ảnh của mỗi tin, trả { lead_id: số } — lỗi thì trả {} để danh sách vẫn chạy */
+export async function countLeadImages() {
+    try {
+        const { data, error } = await supabase.from(IMAGES_TABLE).select("lead_id");
+        if (error) return {};
+        const c = {};
+        for (const r of data || []) c[r.lead_id] = (c[r.lead_id] || 0) + 1;
+        return c;
+    } catch {
+        return {};
+    }
+}
+
+/** Tải nhiều ảnh / PDF lên 1 tin. onProgress(done, total) */
+export async function addLeadImages(leadId, files, category = "car", onProgress) {
+    const list = Array.from(files || []);
+    const added = [];
+    for (let i = 0; i < list.length; i++) {
+        const f = list[i];
+        const isImage = f.type.startsWith("image/");
+        let body = f;
+        let ext = (f.name.split(".").pop() || "bin").toLowerCase();
+        let type = f.type || "application/octet-stream";
+        if (isImage) {
+            body = await imageCompression(f, {
+                // giấy tờ cần nét để đọc chữ
+                maxSizeMB: category === "papers" ? 1.5 : 0.8,
+                maxWidthOrHeight: category === "papers" ? 2400 : 1920,
+                useWebWorker: true,
+                fileType: "image/jpeg",
+            });
+            ext = "jpg";
+            type = "image/jpeg";
+        }
+        const path = `leads/${leadId}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+        const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, body, {
+            contentType: type,
+            upsert: false,
+        });
+        if (upErr) throw upErr;
+
+        const { data, error } = await supabase
+            .from(IMAGES_TABLE)
+            .insert({ lead_id: leadId, category, storage_path: path, file_name: f.name, mime_type: type })
+            .select()
+            .single();
+        if (error) throw error;
+        added.push(data);
+        onProgress?.(i + 1, list.length);
+    }
+    return added;
+}
+
+export async function updateLeadImage(id, patch) {
+    const { error } = await supabase.from(IMAGES_TABLE).update(patch).eq("id", id);
+    if (error) throw error;
+}
+
+export async function deleteLeadImage(img) {
+    await supabase.storage.from(BUCKET).remove([img.storage_path]);
+    const { error } = await supabase.from(IMAGES_TABLE).delete().eq("id", img.id);
     if (error) throw error;
 }
