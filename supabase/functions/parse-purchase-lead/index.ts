@@ -23,6 +23,7 @@ const corsHeaders = {
 // Model rẻ cho văn bản, model đọc ảnh tốt hơn cho ảnh chụp màn hình
 const TEXT_MODEL = "gpt-5.6-luna";
 const IMAGE_MODEL = "gpt-5.6-terra";
+const MAX_IMAGES = 6;
 const MAX_SOURCE_CHARS = 12000;
 
 function json(data: unknown, status = 200) {
@@ -214,7 +215,11 @@ Deno.serve(async (req: Request) => {
     const body = await req.json();
     const text = typeof body?.text === "string" ? body.text.trim() : "";
     const url = typeof body?.url === "string" ? body.url.trim() : "";
-    const image = typeof body?.image === "string" ? body.image : "";
+    // Nhiều ảnh chụp của CÙNG 1 tin (body.images); bản cũ chỉ gửi 1 ảnh (body.image)
+    const images: string[] = (Array.isArray(body?.images) ? body.images : [body?.image])
+      .filter((x: unknown): x is string => typeof x === "string" && x.startsWith("data:image/"))
+      .slice(0, MAX_IMAGES);
+    const image = images[0] || "";
 
     if (!text && !url && !image) return json({ error: "Chưa có nội dung, link hay ảnh để đọc." }, 400);
 
@@ -263,8 +268,16 @@ Deno.serve(async (req: Request) => {
             {
               role: "user",
               content: [
-                { type: "input_text", text: prompt + (text ? `\n\nGHI CHÚ KÈM THEO:\n${text}` : "") },
-                { type: "input_image", image_url: image },
+                {
+                  type: "input_text",
+                  text:
+                    prompt +
+                    (images.length > 1
+                      ? `\n\nCó ${images.length} ảnh chụp, đều là CÙNG MỘT tin đăng (chụp nối tiếp phần dưới / bình luận). Gộp thông tin từ tất cả ảnh thành 1 xe.`
+                      : "") +
+                    (text ? `\n\nGHI CHÚ KÈM THEO:\n${text}` : ""),
+                },
+                ...images.map((img) => ({ type: "input_image", image_url: img })),
               ],
             },
           ]
