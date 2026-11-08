@@ -1458,6 +1458,42 @@ function getPriceTeaser(price) {
 
 
 // ==========================================
+// NHẬN DIỆN TIÊU ĐỀ VIẾT IN HOA
+// ==========================================
+// Khối ngắn (≤ 2 dòng), có ít nhất 10 chữ cái,
+// và ≥ 80% chữ cái là chữ in hoa.
+
+function isUppercaseHeadline(block) {
+
+    const text =
+        String(block || "").trim();
+
+    if (
+        !text ||
+        text.split("\n").length > 2
+    ) {
+        return false;
+    }
+
+    const letters =
+        text.match(/\p{L}/gu) || [];
+
+    if (letters.length < 10) {
+        return false;
+    }
+
+    const upper =
+        letters.filter(
+            (ch) =>
+                ch === ch.toUpperCase() &&
+                ch !== ch.toLowerCase()
+        ).length;
+
+    return upper / letters.length >= 0.8;
+}
+
+
+// ==========================================
 // TẠO CONTENT VARIANT
 // ==========================================
 
@@ -1510,10 +1546,31 @@ const normalized =
     }
 
 
-    const blocks =
+    const allBlocks =
         splitContentBlocks(
             normalized
         );
+
+
+    // ======================================
+    // TIÊU ĐỀ IN HOA CỦA ÔNG → LUÔN Ở TRÊN CÙNG
+    // vd "LANDCRUISER LC300 2023 XE CỰC ĐẸP - BH CHÍNH HÃNG TOYOTA SURE"
+    // ======================================
+
+    const headlineIndex =
+        allBlocks.findIndex(
+            isUppercaseHeadline
+        );
+
+    const headline =
+        headlineIndex >= 0
+            ? allBlocks[headlineIndex]
+            : "";
+
+    const blocks =
+        headlineIndex >= 0
+            ? allBlocks.filter((_, i) => i !== headlineIndex)
+            : allBlocks;
 
 
     const orderedBlocks =
@@ -1580,6 +1637,8 @@ const priceLine =
     // --------------------------------------
 
     const result = [
+
+    headline,
 
     hook,
 
