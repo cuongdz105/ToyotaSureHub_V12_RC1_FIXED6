@@ -1410,7 +1410,7 @@ const FACEBOOK_VARIATION_CTA = [
 
     "🚘 Muốn xem xe tận mắt, liên hệ Cương đẹp zai: 0933.666.980",
 
-    "📞 Bác nào quan tâm em gửi thêm ảnh và thông tin chi tiết: 0933.666.980",
+    "📞 Bác nào quan tâm, em gửi thêm ảnh và thông tin chi tiết: 0933.666.980",
 
     "👉 Đừng chỉ nhìn ảnh, các bác qua xem thực tế sẽ thấy chiếc này rất đáng cân nhắc. Liên hệ Cương đẹp zai: 0933.666.980",
 
@@ -1434,6 +1434,7 @@ const FACEBOOK_VARIATION_CTA = [
 // 468 → 4xx
 // 525 → 5xx
 // 685 → 6xx
+// 4500 → 4 tỷ 5xx
 // ==========================================
 
 function getPriceTeaser(price) {
@@ -1446,6 +1447,18 @@ function getPriceTeaser(price) {
         numericPrice <= 0
     ) {
         return "";
+    }
+
+    // Từ 1 tỷ trở lên: "4 tỷ 5xx" (tránh đọc nhầm "45xx" thành 45 triệu)
+    if (numericPrice >= 1000) {
+
+        const billion =
+            Math.floor(numericPrice / 1000);
+
+        const hundred =
+            Math.floor((numericPrice % 1000) / 100);
+
+        return `${billion} tỷ ${hundred}xx`;
     }
 
     const hundredMillion =
@@ -1612,10 +1625,31 @@ const normalized =
     // Dòng nhận diện xe
     // --------------------------------------
 
+    // Tiêu đề in hoa đã có tên dòng xe → bỏ dòng 🚗 cho khỏi lặp
+    const squash =
+        (text) =>
+            String(text || "")
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/đ/gi, "d")
+                .toLowerCase()
+                .replace(/[^a-z0-9]/g, "");
+
+    const headlineHasModel =
+        Boolean(headline) &&
+        Boolean(car?.model) &&
+        squash(headline).includes(squash(car.model));
+
     const vehicleLine =
-    carLabel
+    carLabel && !headlineHasModel
         ? `🚗 ${carLabel}`
         : "";
+
+    // Không còn dòng tên xe ngay sau → câu mở đầu kết thúc bằng dấu chấm
+    const hookLine =
+        vehicleLine
+            ? hook
+            : hook.replace(/:\s*$/, ".");
 
 
 // ======================================
@@ -1627,9 +1661,12 @@ const priceTeaser =
         car?.price
     );
 
+// Xe tiền tỷ ghi "Giá:", xe dưới 1 tỷ giữ "Giá chỉ"
 const priceLine =
     priceTeaser
-        ? `💰 Giá chỉ ${priceTeaser}`
+        ? Number(car?.price) >= 1000
+            ? `💰 Giá: ${priceTeaser}`
+            : `💰 Giá chỉ ${priceTeaser}`
         : "";
 
     // --------------------------------------
@@ -1640,7 +1677,7 @@ const priceLine =
 
     headline,
 
-    hook,
+    hookLine,
 
     vehicleLine,
 
