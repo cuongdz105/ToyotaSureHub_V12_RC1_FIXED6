@@ -1410,7 +1410,7 @@ const FACEBOOK_VARIATION_CTA = [
 
     "🚘 Muốn xem xe tận mắt, liên hệ Cương đẹp zai: 0933.666.980",
 
-    "📞 Bác nào quan tâm em gửi thêm ảnh và thông tin chi tiết: 0933.666.980",
+    "📞 Bác nào quan tâm, em gửi thêm ảnh và thông tin chi tiết: 0933.666.980",
 
     "👉 Đừng chỉ nhìn ảnh, các bác qua xem thực tế sẽ thấy chiếc này rất đáng cân nhắc. Liên hệ Cương đẹp zai: 0933.666.980",
 
@@ -1434,6 +1434,7 @@ const FACEBOOK_VARIATION_CTA = [
 // 468 → 4xx
 // 525 → 5xx
 // 685 → 6xx
+// 4500 → 4 tỷ 5xx
 // ==========================================
 
 function getPriceTeaser(price) {
@@ -1448,12 +1449,60 @@ function getPriceTeaser(price) {
         return "";
     }
 
+    // Từ 1 tỷ trở lên: "4 tỷ 5xx" (tránh đọc nhầm "45xx" thành 45 triệu)
+    if (numericPrice >= 1000) {
+
+        const billion =
+            Math.floor(numericPrice / 1000);
+
+        const hundred =
+            Math.floor((numericPrice % 1000) / 100);
+
+        return `${billion} tỷ ${hundred}xx`;
+    }
+
     const hundredMillion =
         Math.floor(
             numericPrice / 100
         );
 
     return `${hundredMillion}xx`;
+}
+
+
+// ==========================================
+// NHẬN DIỆN TIÊU ĐỀ VIẾT IN HOA
+// ==========================================
+// Khối ngắn (≤ 2 dòng), có ít nhất 10 chữ cái,
+// và ≥ 80% chữ cái là chữ in hoa.
+
+function isUppercaseHeadline(block) {
+
+    const text =
+        String(block || "").trim();
+
+    if (
+        !text ||
+        text.split("\n").length > 2
+    ) {
+        return false;
+    }
+
+    const letters =
+        text.match(/\p{L}/gu) || [];
+
+    if (letters.length < 10) {
+        return false;
+    }
+
+    const upper =
+        letters.filter(
+            (ch) =>
+                ch === ch.toUpperCase() &&
+                ch !== ch.toLowerCase()
+        ).length;
+
+    return upper / letters.length >= 0.8;
 }
 
 
@@ -1510,10 +1559,31 @@ const normalized =
     }
 
 
-    const blocks =
+    const allBlocks =
         splitContentBlocks(
             normalized
         );
+
+
+    // ======================================
+    // TIÊU ĐỀ IN HOA CỦA ÔNG → LUÔN Ở TRÊN CÙNG
+    // vd "LANDCRUISER LC300 2023 XE CỰC ĐẸP - BH CHÍNH HÃNG TOYOTA SURE"
+    // ======================================
+
+    const headlineIndex =
+        allBlocks.findIndex(
+            isUppercaseHeadline
+        );
+
+    const headline =
+        headlineIndex >= 0
+            ? allBlocks[headlineIndex]
+            : "";
+
+    const blocks =
+        headlineIndex >= 0
+            ? allBlocks.filter((_, i) => i !== headlineIndex)
+            : allBlocks;
 
 
     const orderedBlocks =
@@ -1555,10 +1625,31 @@ const normalized =
     // Dòng nhận diện xe
     // --------------------------------------
 
+    // Tiêu đề in hoa đã có tên dòng xe → bỏ dòng 🚗 cho khỏi lặp
+    const squash =
+        (text) =>
+            String(text || "")
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/đ/gi, "d")
+                .toLowerCase()
+                .replace(/[^a-z0-9]/g, "");
+
+    const headlineHasModel =
+        Boolean(headline) &&
+        Boolean(car?.model) &&
+        squash(headline).includes(squash(car.model));
+
     const vehicleLine =
-    carLabel
+    carLabel && !headlineHasModel
         ? `🚗 ${carLabel}`
         : "";
+
+    // Không còn dòng tên xe ngay sau → câu mở đầu kết thúc bằng dấu chấm
+    const hookLine =
+        vehicleLine
+            ? hook
+            : hook.replace(/:\s*$/, ".");
 
 
 // ======================================
@@ -1570,9 +1661,12 @@ const priceTeaser =
         car?.price
     );
 
+// Xe tiền tỷ ghi "Giá:", xe dưới 1 tỷ giữ "Giá chỉ"
 const priceLine =
     priceTeaser
-        ? `💰 Giá chỉ ${priceTeaser}`
+        ? Number(car?.price) >= 1000
+            ? `💰 Giá: ${priceTeaser}`
+            : `💰 Giá chỉ ${priceTeaser}`
         : "";
 
     // --------------------------------------
@@ -1581,7 +1675,9 @@ const priceLine =
 
     const result = [
 
-    hook,
+    headline,
+
+    hookLine,
 
     vehicleLine,
 
