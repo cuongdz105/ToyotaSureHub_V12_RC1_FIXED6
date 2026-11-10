@@ -89,7 +89,7 @@ export function addToPostingQueue({ campaignId = null, carId, group, content, im
   if (!imageCount || imageCount <= 0) throw new Error("Bài đăng chưa có ảnh.");
   const account = loadAccounts().find((item) => String(item.id) === String(accountId)) || loadAccounts().find((item) => item.isDefault) || loadAccounts()[0];
   if (!account) throw new Error("Chưa có tài khoản Facebook.");
-  if (!isAccountAllowedForGroup(account, group)) throw new Error("Tài khoản Facebook không được phép đăng vào nhóm này.");
+  if (!isAccountAllowedForGroup(account, group)) throw new Error(`Tài khoản ${account.name || "Facebook"} không được phép đăng vào nhóm: ${group.name || group.id}.`);
   const now = new Date().toISOString();
   const job = {
     id: crypto.randomUUID(),
