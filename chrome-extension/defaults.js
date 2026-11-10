@@ -4,6 +4,7 @@ export const DEFAULT_SETTINGS = {
   supabaseKey: "",
   accountId: "",
   accountName: "",
+  boundFbUid: "",          // UID Facebook (cookie c_user) đã gắn với tài khoản trên
   enabled: false,          // công tắc tổng
   activeFrom: 8,
   activeTo: 21,
