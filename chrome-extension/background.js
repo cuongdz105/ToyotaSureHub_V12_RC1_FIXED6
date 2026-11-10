@@ -126,6 +126,38 @@ function appendJobLog(job, message) {
   return { ...payload, logs: [...logs, { message, timestamp: new Date().toISOString() }] };
 }
 
+// ---------------- Kiểm tra đúng nick Facebook ----------------
+// Mỗi hồ sơ Chrome có 1 bản tiện ích riêng. Trước đây nếu chọn nhầm tài khoản
+// trong popup thì Chrome Fly Dragon vẫn nhận job của Cương và đăng bằng Fly Dragon.
+// Giờ tiện ích đọc cookie c_user (UID Facebook đang đăng nhập) và chỉ chạy khi
+// UID đó khớp với nick đã gắn lúc bấm "Lưu cài đặt".
+
+export async function getFbUid() {
+  for (const url of ["https://www.facebook.com", "https://web.facebook.com"]) {
+    try {
+      const cookie = await chrome.cookies.get({ url, name: "c_user" });
+      if (cookie?.value) return cookie.value;
+    } catch { /* bỏ qua */ }
+  }
+  return "";
+}
+
+async function checkFbIdentity(settings) {
+  const uid = await getFbUid();
+  if (!uid) return { ok: false, reason: "Chrome này chưa đăng nhập Facebook." };
+  if (!settings.boundFbUid) {
+    return { ok: false, reason: 'Chưa xác nhận nick Facebook cho tiện ích. Ông mở tiện ích, chọn đúng tài khoản rồi bấm "Lưu cài đặt".' };
+  }
+  if (uid !== settings.boundFbUid) {
+    return {
+      ok: false,
+      mismatch: true,
+      reason: `Chrome đang đăng nhập nick Facebook khác (UID ${uid}) với nick đã gắn cho "${settings.accountName}" (UID ${settings.boundFbUid})`,
+    };
+  }
+  return { ok: true, uid };
+}
+
 // ---------------- Lịch chạy ----------------
 
 chrome.runtime.onInstalled.addListener(async () => {
@@ -218,6 +250,17 @@ async function tick({ manual, only = null }) {
   if (!settings.accountId) return { ok: false, reason: "Chưa chọn tài khoản Facebook trong tiện ích." };
   if (!(await getSession())) return { ok: false, reason: "Tiện ích chưa đăng nhập ToyotaSureHub." };
 
+  const identity = await checkFbIdentity(settings);
+  if (!identity.ok) {
+    if (identity.mismatch && settings.enabled) {
+      await chrome.storage.local.set({ settings: { ...settings, enabled: false } });
+      await patchState({ pausedReason: identity.reason });
+      await log("⛔ " + identity.reason + " → đã tự tắt tự động đăng.", "error");
+      notify("ToyotaSureHub: sai nick Facebook", identity.reason);
+    }
+    return { ok: false, reason: identity.reason };
+  }
+
   if (state.busySince && Date.now() - state.busySince < JOB_TIMEOUT_MS + 60000) {
     return { ok: false, reason: "Đang đăng 1 bài khác." };
   }
@@ -242,7 +285,7 @@ async function tick({ manual, only = null }) {
     const next = kindState(await getState(), kind).nextAllowedAt;
     if (!manual && next && Date.now() < next) continue;
 
-    const job = await pickJob(settings, kind, { ignoreSchedule: manual });
+    const job = await pickJob(settings, kind, { ignoreSchedule: manual, fbUid: identity.uid });
     if (!job) {
       reasons.push(`không có job ${KIND_LABEL[kind]} đang chờ`);
       continue;
@@ -258,7 +301,7 @@ async function tick({ manual, only = null }) {
   return { ok: false, reason: reasons.length ? reasons.join("; ") + "." : "Chưa đến lượt (đang giãn cách)." };
 }
 
-async function pickJob(settings, kind, { ignoreSchedule = false } = {}) {
+async function pickJob(settings, kind, { ignoreSchedule = false, fbUid = "" } = {}) {
   const now = new Date().toISOString();
   // Bấm "Đăng ngay" thì lấy cả bài đang hẹn giờ thử lại
   const scheduleFilter = ignoreSchedule ? "" : `&or=(scheduled_at.is.null,scheduled_at.lte.${encodeURIComponent(now)})`;
@@ -278,7 +321,10 @@ async function pickJob(settings, kind, { ignoreSchedule = false } = {}) {
         status: "processing",
         attempts: (Number(row.attempts) || 0) + 1,
         updated_at: new Date().toISOString(),
-        payload: appendJobLog(row, `🤖 Tiện ích Chrome nhận job (lần ${(Number(row.attempts) || 0) + 1})`),
+        payload: {
+          ...appendJobLog(row, `🤖 Tiện ích Chrome nhận job (lần ${(Number(row.attempts) || 0) + 1}) · Facebook UID ${fbUid}`),
+          postedByFbUid: fbUid,
+        },
       }
     );
     if (Array.isArray(claimed) && claimed.length) return claimed[0];

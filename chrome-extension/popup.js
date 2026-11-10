@@ -1,6 +1,47 @@
 import { DEFAULT_SETTINGS } from "./defaults.js";
 import { signIn, signOut, getSession, rest } from "./supabase.js";
 
+async function getFbUid() {
+  for (const url of ["https://www.facebook.com", "https://web.facebook.com"]) {
+    try {
+      const cookie = await chrome.cookies.get({ url, name: "c_user" });
+      if (cookie?.value) return cookie.value;
+    } catch { /* bỏ qua */ }
+  }
+  return "";
+}
+
+const uidFromProfileUrl = (url) => {
+  const m = String(url || "").match(/[?&]id=(\d+)/) || String(url || "").match(/facebook\.com\/(\d{6,})(?:[/?#]|$)/);
+  return m ? m[1] : "";
+};
+
+async function showFbWho(s) {
+  const el = $("fbWho");
+  const uid = await getFbUid();
+  el.innerHTML = "";
+  if (!uid) {
+    el.className = "hint err";
+    el.textContent = "⚠️ Chrome này chưa đăng nhập Facebook.";
+    return;
+  }
+  const link = document.createElement("a");
+  link.href = `https://www.facebook.com/profile.php?id=${uid}`;
+  link.target = "_blank";
+  link.textContent = "bấm vào đây để xem trang cá nhân";
+  const ok = s.boundFbUid && s.boundFbUid === uid;
+  const wrong = s.boundFbUid && s.boundFbUid !== uid;
+  el.className = "hint " + (ok ? "ok" : wrong ? "err" : "");
+  el.append(
+    ok
+      ? `✅ Nick Facebook của Chrome này đã gắn với "${s.accountName}" (UID ${uid}) — `
+      : wrong
+        ? `⛔ Chrome đang đăng nhập nick KHÁC (UID ${uid}) với nick đã gắn cho "${s.accountName}" — `
+        : `Chrome đang đăng nhập Facebook UID ${uid}, chưa gắn tài khoản — `,
+    link
+  );
+}
+
 const $ = (id) => document.getElementById(id);
 const NUM_FIELDS = [
   "activeFrom", "activeTo",
@@ -58,6 +99,7 @@ async function fillForm() {
   if (session && !s.accountId) $("settingsBox").open = true;
 
   await loadAccounts(s);
+  await showFbWho(s);
 }
 
 async function loadAccounts(s) {
@@ -71,6 +113,7 @@ async function loadAccounts(s) {
       option.value = row.id;
       option.textContent = `${row.name}${row.status !== "active" ? " (tạm ngưng)" : ""}${row.profile_url ? "" : " · chưa có link trang cá nhân"}`;
       option.dataset.name = row.name;
+      option.dataset.profileUrl = row.profile_url || "";
       select.appendChild(option);
     }
     select.value = s.accountId || "";
@@ -171,7 +214,37 @@ $("save").addEventListener("click", async () => {
   const select = $("accountId");
   patch.accountId = select.value;
   patch.accountName = select.selectedOptions[0]?.dataset.name || "";
+
+  // Gắn nick Facebook đang đăng nhập trong Chrome này với tài khoản đã chọn
+  if (patch.accountId) {
+    const uid = await getFbUid();
+    if (!uid) {
+      setMsg("Chrome này chưa đăng nhập Facebook. Ông đăng nhập Facebook trước rồi bấm Lưu lại.", "err");
+      return;
+    }
+    const expected = uidFromProfileUrl(select.selectedOptions[0]?.dataset.profileUrl);
+    if (expected && expected !== uid) {
+      setMsg(`Sai nick: Chrome này đang đăng nhập UID ${uid}, nhưng "${patch.accountName}" là UID ${expected}. Ông chọn lại tài khoản cho đúng.`, "err");
+      return;
+    }
+    const s = await getSettings();
+    if (s.boundFbUid !== uid || s.accountId !== patch.accountId) {
+      const sure = confirm(
+        `Chrome này đang đăng nhập Facebook UID ${uid}.\n\n` +
+          `Ông xác nhận đây đúng là nick "${patch.accountName}"?\n\n` +
+          `(Chưa chắc thì bấm Huỷ, rồi bấm link "xem trang cá nhân" trong phần cài đặt để kiểm tra.)`
+      );
+      if (!sure) {
+        setMsg("Chưa lưu. Ông kiểm tra lại nick Facebook rồi bấm Lưu.", "err");
+        return;
+      }
+    }
+    patch.boundFbUid = uid;
+  } else {
+    patch.boundFbUid = "";
+  }
   await saveSettings(patch);
+  await showFbWho(await getSettings());
   setMsg("Đã lưu cài đặt.", "ok");
   refreshStatus();
 });

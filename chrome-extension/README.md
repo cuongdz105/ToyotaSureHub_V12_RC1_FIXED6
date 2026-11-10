@@ -86,3 +86,11 @@ các nhóm có **dòng xe** trong tên (vd "camry"), thiếu thì dùng **từ k
 - **🧪 Thử nhóm**: làm hết các bước kể cả tick nhóm, nhưng KHÔNG bấm Đăng.
 - Job nhóm ông muốn tự đăng tay thì bấm "Xử lý bài này" trên FB Queue như cũ —
   job đã chuyển trạng thái thì tiện ích không đụng tới.
+
+## v1.2.0 — Chống đăng nhầm nick Facebook
+
+- Tiện ích đọc UID Facebook đang đăng nhập trong Chrome (cookie `c_user`).
+- Bấm **Lưu cài đặt** sẽ gắn UID đó với tài khoản đã chọn (có hộp xác nhận). Nếu link trang cá nhân của tài khoản có dạng `profile.php?id=...` mà UID không khớp thì không cho lưu.
+- Trước mỗi lần nhận job, nếu nick đang đăng nhập khác nick đã gắn → **tự tắt tự động đăng** và báo lỗi, không nhận job.
+- Job ghi thêm `payload.postedByFbUid` = UID thực sự đã đăng.
+- Sau khi cập nhật: mỗi hồ sơ Chrome phải mở tiện ích, chọn đúng tài khoản và bấm **Lưu cài đặt** một lần thì mới chạy lại.
