@@ -123,6 +123,30 @@ function FacebookGroupCard({
     <SectionCard
       title={`👥 ${group.name}`}
     >
+      {/* Link nhóm — để phân biệt các nhóm trùng tên */}
+      <p
+        style={{
+          color: "#666",
+          fontSize: "13px",
+          wordBreak: "break-all",
+        }}
+      >
+        🔗{" "}
+        {group.url ? (
+          <a
+            href={group.url}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {String(group.url)
+              .replace(/^https?:\/\/(www\.|m\.|web\.)?facebook\.com/i, "")
+              .replace(/\/$/, "")}
+          </a>
+        ) : (
+          "(chưa có link)"
+        )}
+      </p>
+
       <p>
         ⭐ Rating:{" "}
         {group.rating || 0}/5

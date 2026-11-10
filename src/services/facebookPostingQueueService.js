@@ -63,7 +63,12 @@ export function getJobTargetUrl(job) {
     const account = loadAccounts().find((item) => String(item.id) === String(job.accountId)) || job.account;
     return account?.profileUrl || "https://www.facebook.com/me";
   }
-  return job?.group?.url || "";
+  // Ưu tiên link hiện tại trong danh sách nhóm (ông sửa link nhóm là job dùng link mới)
+  const groupId = job?.group?.id || job?.groupId;
+  const current = groupId
+    ? (getStoreState().groups || []).find((item) => String(item.id) === String(groupId))
+    : null;
+  return current?.url || job?.group?.url || "";
 }
 
 function persist(job) {

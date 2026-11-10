@@ -40,6 +40,14 @@ export const QUEUE_ERROR_TYPES = {
     GROUP:
         "group",
 
+    // Tài khoản chưa vào nhóm (trang còn nút "Tham gia nhóm")
+    NOT_MEMBER:
+        "not_member",
+
+    // Tiện ích không tìm thấy nút/ô trên giao diện Facebook
+    UI:
+        "ui",
+
     NETWORK:
         "network",
 
@@ -102,6 +110,36 @@ export function classifyQueueError(
     if (!message) {
 
         return QUEUE_ERROR_TYPES.UNKNOWN;
+    }
+
+
+    // -----------------------------------
+    // CHƯA LÀ THÀNH VIÊN NHÓM
+    // (phải xét TRƯỚC "tài khoản", vì câu báo lỗi có chữ "tài khoản")
+    // -----------------------------------
+
+    if (
+        message.includes("chưa là thành viên") ||
+        message.includes("tham gia nhóm") ||
+        message.includes("not a member")
+    ) {
+
+        return QUEUE_ERROR_TYPES.NOT_MEMBER;
+    }
+
+
+    // -----------------------------------
+    // GIAO DIỆN FACEBOOK (không thấy ô soạn bài, nút...)
+    // (xét TRƯỚC "nội dung", vì câu báo có "Viết nội dung...")
+    // -----------------------------------
+
+    if (
+        message.includes("ô soạn bài") ||
+        message.includes("khung soạn bài") ||
+        message.includes("không tìm thấy nút")
+    ) {
+
+        return QUEUE_ERROR_TYPES.UI;
     }
 
 
@@ -387,12 +425,98 @@ export function getQueueFixAction(
     }
 
 
+    const errorCode =
+        typeof job.error === "object" && job.error
+            ? job.error.code
+            : job.errorCode || job.payload?.error?.code;
+
     const type =
-        classifyQueueError(
-            typeof job.error === "object" && job.error
-                ? job.error.reason || job.errorReason || ""
-                : job.error
-        );
+        errorCode === "not_member"
+            ? QUEUE_ERROR_TYPES.NOT_MEMBER
+            : errorCode === "ui"
+                ? QUEUE_ERROR_TYPES.UI
+                : classifyQueueError(
+                    typeof job.error === "object" && job.error
+                        ? job.error.reason || job.errorReason || ""
+                        : job.error
+                );
+
+
+    // ===================================
+    // CHƯA LÀ THÀNH VIÊN NHÓM
+    // ===================================
+
+    if (
+        type ===
+        QUEUE_ERROR_TYPES.NOT_MEMBER
+    ) {
+
+        const accountName =
+            job.account?.name || "tài khoản đăng";
+
+        return {
+
+            type,
+
+            label:
+                "🔧 Sửa link nhóm",
+
+            description:
+                `Bấm "Mở nhóm để tham gia" rồi xin vào nhóm bằng Chrome của ${accountName}. ` +
+                "Nếu nhóm mở ra không phải nhóm ông đã vào (trùng tên), bấm \"Sửa link nhóm\". " +
+                "Xong bấm \"Thử lại\".",
+
+            route:
+                "/facebook/groups",
+
+            params: {
+
+                groupId:
+                    job.group?.id ||
+                    null,
+
+            },
+
+            joinGroup:
+                true,
+
+            canRetry:
+                false,
+
+        };
+    }
+
+
+    // ===================================
+    // GIAO DIỆN FACEBOOK
+    // ===================================
+
+    if (
+        type ===
+        QUEUE_ERROR_TYPES.UI
+    ) {
+
+        return {
+
+            type,
+
+            label:
+                "🔄 Thử lại",
+
+            description:
+                "Tiện ích không tìm thấy nút/ô cần bấm trên Facebook (Facebook đổi giao diện hoặc trang tải chậm). " +
+                "Thử lại; nếu vẫn lỗi, mở Nhật ký xử lý chụp gửi con.",
+
+            route:
+                null,
+
+            params: {},
+
+            canRetry:
+                true,
+
+        };
+    }
 
 
     // ===================================
