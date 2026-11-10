@@ -35,6 +35,7 @@ import {
 } from "../../services/facebookQueueErrorService";
 
 import { getCars } from "../../services/carService";
+import { loadGroups, updateGroup } from "../../services/facebookGroupService";
 
 function loadCars() { return getCars(); }
 
@@ -930,6 +931,40 @@ function handleDownloadImage(image, job, index) {
 
 
             /**
+             * Lỗi "chưa là thành viên": tiện ích đã tự TẮT nhóm.
+             * Ông đã vào nhóm / sửa link rồi bấm Thử lại → bật lại nhóm.
+             */
+
+            if (
+                getQueueFixAction(job).type ===
+                "not_member"
+            ) {
+
+                const groupId =
+                    job.group?.id ||
+                    job.groupId;
+
+                const group =
+                    loadGroups().find(
+                        (item) =>
+                            String(item.id) ===
+                            String(groupId)
+                    );
+
+                if (
+                    group &&
+                    group.status !== "active"
+                ) {
+
+                    await updateGroup(
+                        group.id,
+                        { status: "active" }
+                    );
+                }
+            }
+
+
+            /**
              * FAILED → PENDING
              *
              * Worker chỉ nhận Job PENDING.
@@ -1241,21 +1276,27 @@ function handleDownloadImage(image, job, index) {
 
         if (
             action.type ===
-            "group"
+            "group" ||
+            action.type ===
+            "not_member"
         ) {
 
             const params =
                 new URLSearchParams();
 
+            const groupId =
+                job.group?.id ||
+                job.groupId;
+
 
             if (
-                job.group?.id
+                groupId
             ) {
 
                 params.set(
                     "groupId",
                     String(
-                        job.group.id
+                        groupId
                     )
                 );
             }
@@ -1867,6 +1908,30 @@ function handleDownloadImage(image, job, index) {
                                                         ? "Fanpage (API chính thức)"
                                                         : job.group?.name || "-"}
                                             </strong>
+
+                                            {/* Link nhóm — phân biệt các nhóm trùng tên */}
+                                            {!isProfileJob(job) &&
+                                                !isPageJob(job) &&
+                                                getJobTargetUrl(job) && (
+                                                <div
+                                                    style={{
+                                                        fontSize: "12px",
+                                                        color: "#666",
+                                                        wordBreak: "break-all",
+                                                    }}
+                                                >
+                                                    🔗{" "}
+                                                    <a
+                                                        href={getJobTargetUrl(job)}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                    >
+                                                        {getJobTargetUrl(job)
+                                                            .replace(/^https?:\/\/(www\.|m\.|web\.)?facebook\.com/i, "")
+                                                            .replace(/\/$/, "")}
+                                                    </a>
+                                                </div>
+                                            )}
                                         </div>
 
 
@@ -2029,6 +2094,29 @@ function handleDownloadImage(image, job, index) {
                                                         "wrap",
                                                 }}
                                             >
+
+                                                {/* Chưa vào nhóm → mở đúng link nhóm tiện ích đã dùng */}
+                                                {fixAction?.joinGroup &&
+                                                    getJobTargetUrl(job) && (
+
+                                                    <PrimaryButton
+                                                        onClick={() =>
+                                                            window.open(
+                                                                getJobTargetUrl(job),
+                                                                "_blank",
+                                                                "noopener,noreferrer"
+                                                            )
+                                                        }
+                                                        style={{
+                                                            background:
+                                                                "#1877f2",
+                                                        }}
+                                                    >
+                                                        🌐 Mở nhóm để tham gia
+                                                    </PrimaryButton>
+
+                                                )}
+
 
                                                 {fixAction &&
                                                     fixAction.route && (

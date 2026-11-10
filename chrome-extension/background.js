@@ -370,15 +370,16 @@ function groupUrlOf(job) {
   return normalizeGroupUrl(g.url) || normalizeGroupUrl(g.link) || normalizeGroupUrl(g.facebookGroupId);
 }
 
-// Job thiếu link → đọc lại từ danh sách nhóm (link / mã nhóm mới nhất)
+// Ưu tiên link MỚI NHẤT trong danh sách nhóm (ông sửa link nhóm rồi bấm
+// "Thử lại" là dùng link mới ngay). Không đọc được thì dùng link lưu trong job.
 async function resolveGroupUrl(job) {
   const fromJob = groupUrlOf(job);
-  if (fromJob || !job.group_id) return fromJob;
+  if (!job.group_id) return fromJob;
   try {
     const rows = await rest("GET", `facebook_groups?select=group_url,group_id&id=eq.${job.group_id}&limit=1`);
-    return normalizeGroupUrl(rows?.[0]?.group_url) || normalizeGroupUrl(rows?.[0]?.group_id);
+    return normalizeGroupUrl(rows?.[0]?.group_url) || normalizeGroupUrl(rows?.[0]?.group_id) || fromJob;
   } catch {
-    return "";
+    return fromJob;
   }
 }
 

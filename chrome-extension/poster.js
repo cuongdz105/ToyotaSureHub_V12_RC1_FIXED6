@@ -21,7 +21,8 @@
 
 export async function postToFacebook(job, images, opts) {
   const TEXT = {
-    composer: /^(bạn đang nghĩ gì|what'?s on your mind|viết nội dung|write something|bạn viết gì đi|tạo bài viết công khai|create a public post)/i,
+    // KHÔNG neo "^": tường cá nhân tiếng Việt hiện "Cương ơi, bạn đang nghĩ gì thế?" (tên đứng trước)
+    composer: /(bạn đang nghĩ gì|what'?s on your mind|viết nội dung|write something|bạn viết gì đi|tạo bài viết công khai|create a public post)/i,
     shareGroups: /^(chia sẻ (lên|vào|với) (nhiều |các |thêm )?nhóm|đăng (lên|vào|trong) (nhiều |các |thêm )?nhóm|thêm nhóm|chọn nhóm|nhóm khác|share (to|in) (more |other )?groups?|post (to|in) (more |other )?groups?|add groups?|more groups)/i,
     groupsDone: /^(xong|done|lưu|save|áp dụng|apply|chọn|select|ok)$/i,
     shareLimit: /(đạt đến giới hạn|reached the limit|giới hạn chia sẻ|sharing limit)/i,

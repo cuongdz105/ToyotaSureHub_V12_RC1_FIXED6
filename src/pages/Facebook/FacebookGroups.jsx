@@ -264,6 +264,59 @@ function findDuplicateGroup(
     );
 }
 
+// ==========================================
+// TÌM NHÓM TRÙNG TÊN (khác link)
+// ------------------------------------------
+// Facebook có nhiều nhóm cùng tên "MUA BÁN Ô TÔ CŨ ✅"
+// → so tên đã bỏ dấu, emoji, phần "Nhóm Công khai · 56,2K thành viên".
+// ==========================================
+
+function normalizeGroupName(value = "") {
+    return String(value || "")
+        .replace(/\s*·?\s*Nhóm\s+(Công khai|Riêng tư).*$/i, "")
+        .replace(/\s*·?\s*(Public|Private)\s+group.*$/i, "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/đ/gi, "d")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+}
+
+function findSameNameGroups(
+    candidateName,
+    excludeGroupId = null
+) {
+    const key = normalizeGroupName(candidateName);
+
+    if (!key) return [];
+
+    return groups.filter(
+        (group) =>
+            (excludeGroupId === null ||
+                String(group.id) !== String(excludeGroupId)) &&
+            normalizeGroupName(group.name) === key
+    );
+}
+
+function confirmSameName(sameNameGroups, candidateUrl) {
+    if (sameNameGroups.length === 0) return true;
+
+    return window.confirm(
+        "⚠️ ĐÃ CÓ NHÓM CÙNG TÊN NHƯNG KHÁC LINK!\n\n" +
+        sameNameGroups
+            .map(
+                (group) =>
+                    `👥 ${group.name}\n🔗 ${group.url || "(chưa có link)"}`
+            )
+            .join("\n\n") +
+        `\n\nLink ông đang nhập:\n🔗 ${candidateUrl}\n\n` +
+        "Facebook có nhiều nhóm trùng tên. Ông mở cả 2 link kiểm tra " +
+        "xem đúng nhóm mình đã tham gia chưa.\n\n" +
+        "Bấm OK để vẫn lưu, Hủy để xem lại."
+    );
+}
+
   useEffect(() => {
     refreshData();
 
@@ -399,6 +452,20 @@ async function handleAddGroup() {
         );
 
 
+        return;
+    }
+
+
+    // ========================================
+    // CẢNH BÁO TRÙNG TÊN (khác link)
+    // ========================================
+
+    if (
+        !confirmSameName(
+            findSameNameGroups(cleanName),
+            cleanUrl
+        )
+    ) {
         return;
     }
 
@@ -544,11 +611,43 @@ async function handleAddGroup() {
       return;
     }
 
+    const cleanUrl = editForm.url.trim();
+
+    // Link mới trùng với nhóm khác đã có → không cho lưu
+    if (cleanUrl) {
+      const duplicateGroup = findDuplicateGroup(cleanUrl, group.id);
+
+      if (duplicateGroup) {
+        alert(
+          "⚠️ Link này đang là của nhóm khác:\n\n" +
+          `👥 ${duplicateGroup.name}\n` +
+          `🔗 ${duplicateGroup.url || "(chưa có link)"}`
+        );
+        return;
+      }
+    }
+
+    if (
+      !confirmSameName(
+        findSameNameGroups(editForm.name, group.id),
+        cleanUrl || "(trống)"
+      )
+    ) {
+      return;
+    }
+
+    const urlChanged =
+      normalizeGroupUrl(cleanUrl) !== normalizeGroupUrl(group.url || "");
+
     const updatedGroup = await updateGroup(
       group.id,
       {
         name: editForm.name.trim(),
-        url: editForm.url.trim(),
+        url: cleanUrl ? normalizeGroupUrl(cleanUrl) || cleanUrl : "",
+        // Đổi link thì cập nhật luôn mã nhóm, tránh giữ mã của nhóm cũ
+        ...(urlChanged
+          ? { facebookGroupId: extractFacebookGroupId(cleanUrl) || null }
+          : {}),
         status: editForm.status,
         rating: Number(editForm.rating) || 0,
         members: editForm.members.trim(),
@@ -1172,88 +1271,6 @@ async function handleAddGroup() {
         )}
 
       {/* =====================================
-          TÌM NHÓM
-      ====================================== */}
-
-      <SectionCard
-        title="🔍 Tìm hội nhóm"
-      >
-        <TextInput
-          placeholder="Nhập tên nhóm, dòng xe..."
-          value={search}
-          onChange={(e) =>
-            setSearch(
-              e.target.value
-            )
-          }
-        />
-
-        <br />
-        <br />
-
-        {search && (
-          <p>
-            Tìm thấy:{" "}
-            <strong>
-              {
-                searchedGroups.length
-              }
-            </strong>{" "}
-            nhóm
-          </p>
-        )}
-
-        {search &&
-          searchedGroups.map(
-            (group) => (
-              <div
-                key={group.id}
-                style={{
-                  border:
-                    "1px solid #ddd",
-                  borderRadius:
-                    "10px",
-                  padding: "15px",
-                  marginBottom:
-                    "10px",
-                }}
-              >
-                <h3>
-                  👥{" "}
-                  {group.name}
-                </h3>
-
-                <p>
-                  ⭐ Độ phù hợp:{" "}
-                  {
-                    getGroupScore(
-                      group
-                    )
-                  }
-                  %
-                </p>
-
-                <PrimaryButton
-                  onClick={() =>
-                    handleSelectGroup(
-                      {
-                        ...group,
-                        matchScore:
-                          getGroupScore(
-                            group
-                          ),
-                      }
-                    )
-                  }
-                >
-                  👉 Chọn nhóm này
-                </PrimaryButton>
-              </div>
-            )
-          )}
-      </SectionCard>
-
-      {/* =====================================
           THÊM NHÓM
       ====================================== */}
 
@@ -1300,12 +1317,54 @@ async function handleAddGroup() {
       <SectionCard
         title="📚 Thư viện hội nhóm"
       >
+        {/* TÌM NHÓM — lọc ngay danh sách bên dưới, mỗi nhóm vẫn đủ nút
+            Mở nhóm / Xem tài khoản / Đã đăng / Sửa / Xoá */}
+        <TextInput
+          placeholder="🔍 Tìm theo tên nhóm, link, dòng xe..."
+          value={search}
+          onChange={(e) =>
+            setSearch(
+              e.target.value
+            )
+          }
+        />
+
+        {search.trim() && (
+          <p>
+            Tìm thấy:{" "}
+            <strong>
+              {searchedGroups.length}
+            </strong>{" "}
+            nhóm{" "}
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              style={{
+                marginLeft: "8px",
+                padding: "4px 10px",
+                border: "1px solid #ccc",
+                borderRadius: "8px",
+                background: "#fff",
+                cursor: "pointer",
+              }}
+            >
+              ✖ Xoá tìm
+            </button>
+          </p>
+        )}
+
+        <br />
+
         {groups.length === 0 ? (
           <EmptyState
             text="Chưa có hội nhóm."
           />
+        ) : searchedGroups.length === 0 ? (
+          <EmptyState
+            text="Không có nhóm nào khớp từ khoá."
+          />
         ) : (
-          groups.map(
+          searchedGroups.map(
             (group) => {
               const groupAccounts =
                 getGroupAccounts(
@@ -1527,6 +1586,19 @@ async function handleAddGroup() {
                           Hủy
                         </button>
                       </div>
+                    </div>
+                  )}
+
+                  {/* Khi đang tìm: giữ nút chọn nhóm để đăng như ô tìm cũ */}
+                  {search.trim() && (
+                    <div style={{ marginBottom: "8px" }}>
+                      <PrimaryButton
+                        onClick={() =>
+                          handleSelectGroup(group)
+                        }
+                      >
+                        👉 Chọn nhóm này ({getGroupScore(group)}%)
+                      </PrimaryButton>
                     </div>
                   )}
 

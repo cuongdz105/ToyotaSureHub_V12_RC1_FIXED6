@@ -29,6 +29,7 @@ import {
 import {
     loadAccounts,
     getDefaultAccount,
+    isAccountAllowedForGroup as canAccountPostToGroup,
 } from "../../services/facebookAccountService";
 
 import {
@@ -160,6 +161,29 @@ function FacebookPostPreview() {
     }, [location.state]);
 
     // ==========================================
+    // NHÓM ĐANG TẮT / CẤM ĐĂNG
+    // ==========================================
+
+    function isGroupDisabled(group) {
+        return (
+            (group?.status &&
+                group.status !== "active") ||
+            group?.allowPost === false
+        );
+    }
+
+    function groupDisabledReason(group) {
+        if (group?.allowPost === false) {
+            return "nhóm đang để \"Không cho đăng\"";
+        }
+        if (/chưa là thành viên/i.test(group?.notes || "")) {
+            return "tiện ích đã tắt vì tài khoản chưa là thành viên";
+        }
+        return `nhóm đang ở trạng thái "${group?.status}"`;
+    }
+
+
+    // ==========================================
     // KIỂM TRA ACCOUNT CÓ ĐƯỢC PHÉP GROUP
     // ==========================================
 
@@ -182,6 +206,19 @@ function FacebookPostPreview() {
         if (
             account.status !==
             "active"
+        ) {
+
+            return false;
+        }
+
+
+        // Nhóm đã tắt (vd tiện ích tự tắt vì chưa là thành viên)
+        // hoặc nhóm cấm đăng → không cho chọn
+
+        if (
+            isGroupDisabled(
+                currentGroup
+            )
         ) {
 
             return false;
@@ -1861,6 +1898,40 @@ function createVariationPlan(
 
 
             // ======================================
+            // 0. KIỂM TRA TẤT CẢ NHÓM TRƯỚC
+            // --------------------------------------
+            // Có nhóm không đăng được thì báo ĐÚNG TÊN nhóm
+            // và dừng luôn, không tạo Campaign / job dở dang.
+            // ======================================
+
+            const blockedGroups =
+                selectedGroups.filter(
+                    (group) =>
+                        !canAccountPostToGroup(
+                            selectedAccount,
+                            group
+                        )
+                );
+
+            if (blockedGroups.length > 0) {
+                throw new Error(
+                    `Có ${blockedGroups.length} nhóm tài khoản ${selectedAccount?.name || ""} không đăng được:\n\n` +
+                    blockedGroups
+                        .map(
+                            (group) =>
+                                `⛔ ${group.name}\n   → ${
+                                    isGroupDisabled(group)
+                                        ? groupDisabledReason(group)
+                                        : "tài khoản không được phép đăng nhóm này"
+                                }`
+                        )
+                        .join("\n\n") +
+                    "\n\nÔng bỏ tick các nhóm trên rồi tạo lại. Chưa có job nào được tạo."
+                );
+            }
+
+
+            // ======================================
             // 1. TẠO CAMPAIGN
             // ======================================
 
@@ -2501,6 +2572,43 @@ const job =
 <SectionCard
     title="👥 2. Chọn các nhóm muốn đăng"
 >
+
+    {/* Nhóm đang tắt không hiện trong danh sách — báo tên để ông biết */}
+    {selectedAccount &&
+        groups.some(isGroupDisabled) && (
+        <details
+            style={{
+                marginBottom: "12px",
+                padding: "10px 12px",
+                background: "#fff3cd",
+                border: "1px solid #ffe69c",
+                borderRadius: "8px",
+                fontSize: "14px",
+            }}
+        >
+            <summary style={{ cursor: "pointer" }}>
+                ⛔ {groups.filter(isGroupDisabled).length} nhóm đang tắt nên không hiện ở đây (bấm để xem)
+            </summary>
+
+            {groups
+                .filter(isGroupDisabled)
+                .map((group) => (
+                    <div
+                        key={group.id}
+                        style={{ marginTop: "8px" }}
+                    >
+                        <strong>{group.name}</strong>
+                        <div style={{ color: "#666" }}>
+                            → {groupDisabledReason(group)}
+                        </div>
+                    </div>
+                ))}
+
+            <div style={{ marginTop: "8px", color: "#666" }}>
+                💡 Đã vào nhóm rồi thì sang trang Nhóm, bấm Sửa → đổi trạng thái về active.
+            </div>
+        </details>
+    )}
 
     {!selectedAccount ? (
 
