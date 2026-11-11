@@ -257,6 +257,14 @@ async function tick({ manual, only = null }) {
       await patchState({ pausedReason: identity.reason });
       await log("⛔ " + identity.reason + " → đã tự tắt tự động đăng.", "error");
       notify("ToyotaSureHub: sai nick Facebook", identity.reason);
+    } else if (!manual && settings.enabled) {
+      // Chưa gắn nick / Chrome chưa đăng nhập FB: không im lặng nữa — ghi nhật ký + báo 1 lần mỗi giờ
+      const st = await getState();
+      if (!st.identityWarnAt || Date.now() - st.identityWarnAt > 60 * 60000) {
+        await patchState({ identityWarnAt: Date.now(), pausedReason: identity.reason });
+        await log("⏸ Chưa đăng được: " + identity.reason, "error");
+        notify("ToyotaSureHub chưa đăng bài", identity.reason);
+      }
     }
     return { ok: false, reason: identity.reason };
   }
