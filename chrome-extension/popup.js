@@ -148,7 +148,7 @@ async function refreshStatus() {
       ? `Hôm nay đã chia sẻ thêm ${res.sharedTodayCount} nhóm.`
       : "";
     const paused = $("paused");
-    paused.hidden = !res.pausedReason || s.enabled;
+    paused.hidden = !res.pausedReason || (s.enabled && !/nick|Facebook/.test(res.pausedReason));
     paused.textContent = `⛔ Đã tự tạm dừng: ${res.pausedReason}. Ông kiểm tra Facebook rồi bật lại công tắc.`;
   }
   const { logs = [] } = await chrome.storage.local.get("logs");
@@ -245,6 +245,8 @@ $("save").addEventListener("click", async () => {
   }
   await saveSettings(patch);
   await showFbWho(await getSettings());
+  const { state = {} } = await chrome.storage.local.get("state");
+  await chrome.storage.local.set({ state: { ...state, pausedReason: "", identityWarnAt: null } });
   setMsg("Đã lưu cài đặt.", "ok");
   refreshStatus();
 });
