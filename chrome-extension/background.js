@@ -429,8 +429,33 @@ async function resolveGroupUrl(job) {
   }
 }
 
+// Cửa sổ Facebook tiện ích đã mở mà còn để lại (job lỗi / chưa chắc đã đăng được
+// giữ lại cho ông xem). Trước khi mở job mới, đóng các cửa sổ cũ hơn 15 phút
+// để máy không bị đầy tab Facebook khi chạy cả ngày.
+const LEFTOVER_WINDOW_MIN = 15;
+
+async function closeLeftoverWindows() {
+  const { openedWindows = [] } = await getState();
+  const keep = [];
+  for (const item of openedWindows) {
+    if (Date.now() - item.at > LEFTOVER_WINDOW_MIN * 60000) {
+      await chrome.windows.remove(item.id).catch(() => {});
+    } else {
+      keep.push(item);
+    }
+  }
+  await patchState({ openedWindows: keep });
+}
+
+async function rememberWindow(id) {
+  const { openedWindows = [] } = await getState();
+  await patchState({ openedWindows: [...openedWindows.filter((w) => w.id !== id), { id, at: Date.now() }] });
+}
+
 async function openFacebook(url) {
+  await closeLeftoverWindows().catch(() => {});
   const win = await chrome.windows.create({ url, focused: false, type: "normal", width: 1200, height: 900 });
+  await rememberWindow(win.id).catch(() => {});
   const tabId = win.tabs[0].id;
   await new Promise((resolve) => {
     const timer = setTimeout(done, 45000);
