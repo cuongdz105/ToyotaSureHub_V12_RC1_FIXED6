@@ -35,6 +35,7 @@ export async function postToFacebook(job, images, opts) {
     post: /^(đăng|post)$/i,
     next: /^(tiếp|next)$/i,
     blocked: /(tạm thời bị chặn|temporarily blocked|bạn không thể đăng|you can'?t post|chặn tính năng|feature blocked|hành vi đáng ngờ|suspicious activity)/i,
+    posted: /(bài viết của bạn đã được đăng|đã đăng bài viết|đã chia sẻ (lên|vào|với)|đang chờ (quản trị viên )?phê duyệt|bài viết của bạn đang chờ|your post (is|has been) (now )?(published|posted|shared)|post(ed)? (is )?pending|pending (admin )?approval|shared to \d+ groups?)/i,
     error: /(đã xảy ra lỗi|something went wrong|không thể đăng bài|couldn'?t post|thử lại sau|try again later)/i,
   };
 
@@ -519,11 +520,27 @@ export async function postToFacebook(job, images, opts) {
     step("Đã bấm \"Đăng\"");
 
     // ---------- 6. Chờ đăng xong ----------
+    // Chỉ theo dõi ĐÚNG khung soạn bài vừa bấm Đăng. Trước đây dùng findEditor()
+    // (mọi ô nhập trong mọi hộp thoại) nên khi Facebook mở thêm hộp thoại có ô
+    // bình luận sau khi đăng, tiện ích tưởng khung soạn bài chưa đóng → báo timeout
+    // dù bài đã lên.
+    const composerDialog = postBtn.closest('[role="dialog"]') || (dialog !== document ? dialog : null);
+    const contentKey = content.replace(/\s+/g, "").slice(0, 40);
+    const composerStillOpen = () => {
+      if (!composerDialog || !composerDialog.isConnected || !isVisible(composerDialog)) return false;
+      // Hộp thoại còn nhưng nội dung bài đã bị xoá khỏi đó → Facebook đã nhận bài
+      if (contentKey && !(composerDialog.innerText || "").replace(/\s+/g, "").includes(contentKey)) return false;
+      return true;
+    };
+    const findSuccessToast = () =>
+      [...document.querySelectorAll('[role="alert"], [role="status"], [role="dialog"]')].some((node) =>
+        node !== composerDialog && TEXT.posted.test((node.innerText || "").slice(0, 600))
+      );
     const finished = await waitFor(() => {
       const block = findBlockMessage();
       if (block) return block;
-      const stillOpen = findEditor() || (postBtn.isConnected && isVisible(postBtn));
-      return stillOpen ? null : { code: "ok" };
+      if (findSuccessToast()) return { code: "ok" };
+      return composerStillOpen() ? null : { code: "ok" };
     }, 120000, 1000);
 
     if (!finished) return done(false, "timeout", "Bấm Đăng rồi nhưng sau 2 phút khung soạn bài vẫn chưa đóng.");
