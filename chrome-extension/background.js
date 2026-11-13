@@ -19,7 +19,7 @@ const MAX_ATTEMPTS = 2;               // Thử tối đa 2 lần rồi mới bá
 const RETRY_DELAY_MIN = 30;           // Lỗi thì 30 phút sau thử lại
 const STUCK_AFTER_MIN = 15;           // Job "đang xử lý" quá 15 phút = bị kẹt
 const MAX_IMAGES = 20;
-const JOB_TIMEOUT_MS = 8 * 60 * 1000; // Nhóm phải cuộn danh sách nên cho lâu hơn
+const JOB_TIMEOUT_MS = 12 * 60 * 1000; // Nhóm phải cuộn danh sách + chờ bài hết mờ (tải ảnh)
 
 const KINDS = ["profile", "group"];
 const KIND_LABEL = { profile: "tường", group: "nhóm" };
@@ -455,7 +455,7 @@ async function runInTab(tabId, job, images, opts) {
     args: [{ content: job.payload?.content || "" }, images, opts],
   });
   const timeout = new Promise((resolve) =>
-    setTimeout(() => resolve([{ result: { ok: false, code: "timeout", reason: "Quá 8 phút chưa đăng xong.", steps: [] } }]), JOB_TIMEOUT_MS)
+    setTimeout(() => resolve([{ result: { ok: false, code: "timeout", reason: "Quá 12 phút chưa đăng xong.", steps: [] } }]), JOB_TIMEOUT_MS)
   );
   const [first] = await Promise.race([exec, timeout]);
   return first?.result || { ok: false, code: "script", reason: "Script không trả kết quả.", steps: [] };

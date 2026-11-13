@@ -35,6 +35,7 @@ export async function postToFacebook(job, images, opts) {
     post: /^(đăng|post)$/i,
     next: /^(tiếp|next)$/i,
     blocked: /(tạm thời bị chặn|temporarily blocked|bạn không thể đăng|you can'?t post|chặn tính năng|feature blocked|hành vi đáng ngờ|suspicious activity)/i,
+    posted: /(bài viết của bạn đã được đăng|đã đăng bài viết|đã chia sẻ (lên|vào|với)|đang chờ (quản trị viên )?phê duyệt|bài viết của bạn đang chờ|your post (is|has been) (now )?(published|posted|shared)|post(ed)? (is )?pending|pending (admin )?approval|shared to \d+ groups?)/i,
     error: /(đã xảy ra lỗi|something went wrong|không thể đăng bài|couldn'?t post|thử lại sau|try again later)/i,
   };
 
@@ -519,17 +520,57 @@ export async function postToFacebook(job, images, opts) {
     step("Đã bấm \"Đăng\"");
 
     // ---------- 6. Chờ đăng xong ----------
+    // Chỉ theo dõi ĐÚNG khung soạn bài vừa bấm Đăng. Trước đây dùng findEditor()
+    // (mọi ô nhập trong mọi hộp thoại) nên khi Facebook mở thêm hộp thoại có ô
+    // bình luận sau khi đăng, tiện ích tưởng khung soạn bài chưa đóng → báo timeout
+    // dù bài đã lên.
+    const composerDialog = postBtn.closest('[role="dialog"]') || (dialog !== document ? dialog : null);
+    const contentKey = content.replace(/\s+/g, "").slice(0, 40);
+    const composerStillOpen = () => {
+      if (!composerDialog || !composerDialog.isConnected || !isVisible(composerDialog)) return false;
+      // Hộp thoại còn nhưng nội dung bài đã bị xoá khỏi đó → Facebook đã nhận bài
+      if (contentKey && !(composerDialog.innerText || "").replace(/\s+/g, "").includes(contentKey)) return false;
+      return true;
+    };
+    const findSuccessToast = () =>
+      [...document.querySelectorAll('[role="alert"], [role="status"], [role="dialog"]')].some((node) =>
+        node !== composerDialog && TEXT.posted.test((node.innerText || "").slice(0, 600))
+      );
     const finished = await waitFor(() => {
       const block = findBlockMessage();
       if (block) return block;
-      const stillOpen = findEditor() || (postBtn.isConnected && isVisible(postBtn));
-      return stillOpen ? null : { code: "ok" };
+      if (findSuccessToast()) return { code: "ok" };
+      return composerStillOpen() ? null : { code: "ok" };
     }, 120000, 1000);
 
     if (!finished) return done(false, "timeout", "Bấm Đăng rồi nhưng sau 2 phút khung soạn bài vẫn chưa đóng.");
     if (finished.code === "blocked") return done(false, "blocked", "Facebook báo đang chặn tính năng: " + finished.text.slice(0, 200));
 
+    // Facebook đóng khung soạn bài ngay nhưng bài còn hiện MỜ trong nhóm trong lúc
+    // tải ảnh lên. Phải chờ bài hết mờ rồi mới báo xong — đóng cửa sổ sớm có thể
+    // làm hỏng lượt tải ảnh.
+    const postKey = content.replace(/\s+/g, " ").trim().slice(0, 25);
+    const effectiveOpacity = (el) => {
+      let value = 1;
+      for (let node = el; node && node !== document.body; node = node.parentElement) {
+        value *= Number(getComputedStyle(node).opacity) || 0;
+        if (value < 0.95) break;
+      }
+      return value;
+    };
+    const stillUploading = () => {
+      if ([...document.querySelectorAll('[role="progressbar"]')].some(isVisible)) return true;
+      if (!postKey) return false;
+      return [...document.querySelectorAll('[role="article"], [aria-posinset]')].some(
+        (node) => isVisible(node) && (node.innerText || "").replace(/\s+/g, " ").includes(postKey) && effectiveOpacity(node) < 0.95
+      );
+    };
     await sleep(2500);
+    if (stillUploading()) {
+      step("Bài đang hiện mờ (Facebook đang tải ảnh) — chờ xong");
+      const uploaded = await waitFor(() => !stillUploading(), 300000, 2000);
+      step(uploaded ? "Bài đã hết mờ — Facebook tải xong" : "Sau 5 phút bài vẫn mờ — vẫn tính đã đăng, ông kiểm tra giúp");
+    }
     const lateBlock = findBlockMessage();
     if (lateBlock) return done(false, "blocked", "Facebook báo đang chặn tính năng: " + lateBlock.text.slice(0, 200));
     const errDialog = [...document.querySelectorAll('[role="dialog"], [role="alert"]')].find((node) => TEXT.error.test(node.innerText || ""));
