@@ -1607,10 +1607,28 @@ const normalized =
     // vd "LANDCRUISER LC300 2023 XE CỰC ĐẸP - BH CHÍNH HÃNG TOYOTA SURE"
     // ======================================
 
-    const headlineIndex =
+    // Ưu tiên tiêu đề IN HOA; không có thì lấy câu đầu tiên ông tự viết
+    // (khối đầu ngắn ≤ 2 dòng, ≤ 200 ký tự) làm câu hook ở trên cùng,
+    // vd "Fortuner 2.7 4x2 2024 đẹp miên man"
+    const uppercaseIndex =
         allBlocks.findIndex(
             isUppercaseHeadline
         );
+
+    const firstBlock =
+        String(allBlocks[0] || "").trim();
+
+    const firstBlockIsHook =
+        Boolean(firstBlock) &&
+        firstBlock.split("\n").length <= 2 &&
+        firstBlock.length <= 200;
+
+    const headlineIndex =
+        uppercaseIndex >= 0
+            ? uppercaseIndex
+            : firstBlockIsHook
+                ? 0
+                : -1;
 
     const headline =
         headlineIndex >= 0
